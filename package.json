@@ -1,5 +1,33 @@
 {
   "dependencies": {
-    "firebase": "^10.12.2"
+    "firebase": "^10.12.2",
+    "react-dom": "^18.3.1",
+    "react-scripts": "^5.0.1"
+  },
+  "name": "iatu---pmv",
+  "description": "Este es el PMV de nuestra página web.",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "eject": "react-scripts eject",
+    "dev": "react-scripts start"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
   }
 }

@@ -1,11 +1,11 @@
 import { useState } from 'react'
 
-import appFirebase from '../src/credentials'
+import appFirebase from '../credentials'
 import {getAuth, onAuthStateChanged} from 'firebase/auth'
 const auth = getAuth(appFirebase)
 
-import Login from '../src/components/Login'
-import Home from '../src/components/Home'
+import Login from './components/Login'
+import Home from './components/Home'
 
 function App() {
     
