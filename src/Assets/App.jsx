@@ -22,7 +22,7 @@ function App() {
 
     return (
         <div>
-            {usuario ? <Home correousuario = {usuario.email}/> : <Login/>}
+            {usuario ? <Home correousuario = {usuario.email}/> : <Login/>} 
         </div>
     )
 }
