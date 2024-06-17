@@ -6,5 +6,5 @@ Equipo:
 - Backend 2: Juan Diego Arias
 - Frontend: Hernán Fuentes
 - Base de datos: Alan Cabezas
-- IA integration: Alonso LAUTARO Maureira 
+- IA integration: Alonso Maureira 
 - IA integration: Josefa Flores
