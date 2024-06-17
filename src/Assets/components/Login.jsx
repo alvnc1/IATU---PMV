@@ -9,12 +9,27 @@ const Login = () => {
 
     const [registrando, setRegistrando] = useState(false)
 
+    const functAutentication = async(e) =>{
+        e.PreventDefault();
+        const correo = e.target.email.value;
+        const contrasena = e.target.password.value;
+        if (registrando){
+            await createUserWithEmailAndPassword(auth, correo, contrasena)
+        }
+        else{
+            try {
+                await signInWithEmailAndPassword(auth, correo, password)                
+            } catch (error) {
+                alert("El correo/contrasena no funciona")
+            }
+        }
+    }
+
     return (
         <div className='container'>
-            <h1>PRUEBA</h1>
-            <form>
-                <input type="text" placeholder='email'/>
-                <input type="text" placeholder='contrasena'/>
+            <form onSubmit={functAutentication}>
+                <input type="text" placeholder='email' id="email"/>
+                <input type="text" placeholder='contrasena' id="pass"/>
                 <button>{registrando ? "Registrate" : "Inicia Sesion"}</button>
             </form>
             <h4>{registrando ? "Si ya tienes cuenta" : "No tienes cuenta"}<button onClick={() => setRegistrando(!registrando)}>{registrando ? "Inicia Sesion": "Registrate"}</button></h4>
