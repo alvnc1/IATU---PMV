@@ -1,10 +1,5 @@
-# IATU - PMV
-Este es el PMV de nuestra página web.
+# ReactLoginSignupUITemplate
 
-Equipo:
-- Backend: Pablo Campos
-- Backend 2: Juan Diego Arias
-- Frontend: Hernán Fuentes
-- Base de datos: Alan Cabezas
-- IA integration: Alonso Maureira 
-- IA integration: Josefa Flores
+Build React Login & Sign Up UI Template with Bootstrap 5 - Create React authentication system such as login and sign up template using Bootstrap.
+
+[Build React Login & Sign Up UI Template with Bootstrap 5](https://www.positronx.io/build-react-login-sign-up-ui-template-with-bootstrap-4/)
