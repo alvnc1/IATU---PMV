@@ -94,7 +94,7 @@ function Register() {
         </button>
       </div>
       <p className="forgot-password text-right">
-        Ya estás registrado? <a href="/login">Inciar sesión</a>
+        ¿Ya estás registrado? <a href="/login">Iniciar sesión</a>
       </p>
     </form>
   );

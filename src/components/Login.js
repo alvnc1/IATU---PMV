@@ -64,7 +64,7 @@ function Login() {
           </button>
         </div>
         <p className="forgot-password text-right">
-          Eres nuevo? <a href="/register">Registrate aquí</a>
+          ¿Eres nuevo? <a href="/register">Registrate aquí</a>
         </p>
         <SignInwithGoogle/>
       </form>
