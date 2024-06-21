@@ -3,7 +3,7 @@ import { auth, db } from "./firebase";
 import { toast } from "react-toastify";
 import { setDoc, doc } from "firebase/firestore";
 
-function SignInwithGoogle() {
+function SignInWithGoogle() {
   function googleLogin() {
     const provider = new GoogleAuthProvider();
     signInWithPopup(auth, provider).then(async (result) => {
@@ -35,4 +35,4 @@ function SignInwithGoogle() {
     </div>
   );
 }
-export default SignInwithGoogle;
+export default SignInWithGoogle;

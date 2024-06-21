@@ -10,6 +10,7 @@ body {
   display: flex;
   font-weight: 400;
   font-family: "Roboto Slab", sans-serif;
+  z-index: 0;
 }
 
 h1,
@@ -100,4 +101,3 @@ html,
 .logo {
   max-width: 150px; /* Ajusta el tamaño máximo del logo según tu necesidad */
 }
-

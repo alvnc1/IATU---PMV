@@ -38,6 +38,7 @@ function Register() {
     }
   };
 
+
   return (
     <form onSubmit={handleRegister}>
       <div className="logo-container">
