@@ -11,6 +11,7 @@ import { auth } from "./components/firebase";
 import MyProjects from "./components/myProjects";
 import NewProject from "./components/newProject";
 
+
 function App() {
   const [user, setUser] = useState(null);
 

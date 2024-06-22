@@ -1,17 +1,19 @@
+// src/components/MyProjects.js
 import React, { useEffect, useState } from "react";
 import NavBar from "./navBar";
 import "../login-register.css";
 import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
-import { IoMdPlayCircle } from "react-icons/io";
 import { MdDelete } from "react-icons/md";
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from "./firebase";
+import TestRunner from './testRunner'; // Importa el componente TestRunner
 
 function MyProjects() {
   const [projects, setProjects] = useState([]);
   const [sortOrder, setSortOrder] = useState('asc');
+
   // Función para obtener los proyectos desde Firebase
   const getProjects = async () => {
     const projectsCollection = collection(db, 'proyectos');
@@ -27,19 +29,6 @@ function MyProjects() {
     });
     setProjects(projectsList);
   };
-  
-  const handleSortByDate = () => {
-    if (sortOrder === 'asc') {
-      setSortOrder('desc');
-    } else {
-      setSortOrder('asc');
-    }
-  };
-  
-  useEffect(() => {
-    getProjects();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Función para eliminar un proyecto
   const deleteProject = async (projectId) => {
@@ -53,6 +42,26 @@ function MyProjects() {
     }
   };
 
+  // Función para obtener la información del usuario seleccionado
+  const getUserInfo = (selectedOption) => {
+    if (selectedOption === "opcion1") {
+      return "Javier Sánchez, 32 años";
+    } else if (selectedOption === "opcion2") {
+      return "José Gómez, 68 años";
+    } else {
+      return "Usuario no especificado";
+    }
+  };
+
+  const handleSortByDate = () => {
+    setSortOrder(prevSortOrder => prevSortOrder === 'asc' ? 'desc' : 'asc');
+  };
+
+  useEffect(() => {
+    getProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div>
       <NavBar />
@@ -63,11 +72,11 @@ function MyProjects() {
           backgroundColor: "white",
           borderRadius: "10px",
           padding: "20px",
-          width: "90%", // Ancho del contenedor interno
-          maxWidth: "1200px", // Ancho máximo del contenedor interno
-          height: "80vh", // Altura del contenedor interno
-          overflowY: "auto", // Scroll vertical si es necesario
-          boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)", // Sombra ligera
+          width: "90%",
+          maxWidth: "1200px",
+          height: "80vh",
+          overflowY: "auto",
+          boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)",
         }}
       >
         <div className="d-flex justify-content-between align-items-center">
@@ -81,25 +90,28 @@ function MyProjects() {
                 <th>Nombre del Proyecto</th>
                 <th>Usuario Seleccionado</th>
                 <th>Descripción de la Prueba</th>
+                <th>Sitio Web</th>
                 <th style={{ cursor: 'pointer' }} onClick={handleSortByDate}>Fecha de creación</th>
                 <th style={{ textAlign: "center" }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
               {projects.map(project => (
-                <tr key={project.id}>
-                  <td>{project.nombreProyecto}</td>
-                  <td>{getUserInfo(project.selectedOption)}</td>
-                  <td>{project.inputValue}</td>
-                  <td>{new Date(project.fechaCreacion).toLocaleDateString()}</td>
-                  <td style={{ textAlign: "center" }}>
-                    <div className="d-flex justify-content-between">
-                      <Button variant="success" style={{ fontSize: '10px', padding: '2px 5px' }} onClick={() => window.location.href = `/project/${project.id}`}> <IoMdPlayCircle /> Ejecutar Prueba</Button>
-                      <Button variant="danger" style={{ fontSize: '10px', padding: '2px 5px' }} onClick={() => deleteProject(project.id)}> <MdDelete />Eliminar Proyecto</Button>
-                      
-                    </div>
-                  </td>
-                </tr>
+                <React.Fragment key={project.id}>
+                  <tr>
+                    <td>{project.nombreProyecto}</td>
+                    <td>{getUserInfo(project.selectedOption)}</td>
+                    <td>{project.inputValue}</td>
+                    <td>{project.webLink}</td>
+                    <td>{new Date(project.fechaCreacion).toLocaleDateString()}</td>
+                    <td style={{ textAlign: "center" }}>
+                      <div className="d-flex justify-content-between">
+                        <TestRunner project={project} />
+                        <Button variant="danger" style={{ fontSize: '10px', padding: '2px 5px' }} onClick={() => deleteProject(project.id)}> <MdDelete />Eliminar Proyecto</Button>
+                      </div>
+                    </td>
+                  </tr>
+                </React.Fragment>
               ))}
             </tbody>
           </Table>
@@ -108,16 +120,5 @@ function MyProjects() {
     </div>
   );
 }
-
-// Función para obtener la información del usuario seleccionado
-const getUserInfo = (selectedOption) => {
-  if (selectedOption === "opcion1") {
-    return "Javier Sánchez, 32 años";
-  } else if (selectedOption === "opcion2") {
-    return "José Gómez, 68 años";
-  } else {
-    return "Usuario no especificado";
-  }
-};
 
 export default MyProjects;
