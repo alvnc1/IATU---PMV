@@ -73,7 +73,7 @@ app.post("/run-test", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `para Puppeteer crea el código completo (solo el código) para: ${project.inputValue}, en la web: ${project.webLink} y después de realizar las acciones requeridas, toma una captura de pantalla con el nombre screenshot. Por favor no uses la función waitforTimeout de Puppeteer.`,
+            content: `para Puppeteer crea el código completo con {headless: false} (solo el código) para: ${project.inputValue}, en la web: ${project.webLink} y después de realizar las acciones requeridas, toma una captura de pantalla con el nombre $ screenshot. Por favor no uses la función waitforTimeout de Puppeteer.`,
           },
         ],
         model: "gpt-3.5-turbo",
