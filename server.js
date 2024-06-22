@@ -1,9 +1,7 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
-const openai = require("./src/openaiConfig");
+const openai = require("./src/openaiConfig"); // Asegúrate de tener tu configuración de OpenAI adecuada aquí
 const cors = require("cors"); // Importa el middleware CORS
-const fs = require("fs");
-const path = require("path");
 
 const app = express();
 const port = 3001;
@@ -15,10 +13,57 @@ app.use(express.json());
 
 const MAX_ATTEMPTS = 10;
 
+// Función para verificar criterios de diseño con Puppeteer
+async function checkDesignCriteria(webLink) {
+  const browser = await puppeteer.launch();
+  const page = await browser.newPage();
+  await page.goto(webLink, { waitUntil: "networkidle0" });
+
+  // Lógica para verificar los criterios de diseño
+  const result = await page.evaluate(() => {
+    const body = document.body;
+
+    // Ejemplo de verificación de tamaño de letra y espaciado entre líneas
+    const bodyStyles = window.getComputedStyle(body);
+    const fontSize = parseFloat(bodyStyles.getPropertyValue("font-size"));
+    const lineHeight = parseFloat(bodyStyles.getPropertyValue("line-height"));
+
+    // Ejemplo de verificación de tamaño de letra para títulos
+    const headings = document.querySelectorAll("h1, h2, h3, h4, h5, h6");
+    const headingSizes = [];
+    headings.forEach((heading) => {
+      const headingStyles = window.getComputedStyle(heading);
+      const headingFontSize = parseFloat(headingStyles.getPropertyValue("font-size"));
+      headingSizes.push(headingFontSize);
+    });
+
+    // Ejemplo de verificación de tamaño de botones
+    const buttons = document.querySelectorAll("button");
+    const buttonSizes = [];
+    buttons.forEach((button) => {
+      const buttonRect = button.getBoundingClientRect();
+      buttonSizes.push({ width: buttonRect.width, height: buttonRect.height });
+    });
+
+    return {
+      fontSize: `${fontSize}px`,
+      lineHeight: lineHeight.toFixed(2),
+      headingSizes,
+      buttonSizes,
+    };
+  });
+
+  await browser.close();
+
+  return result;
+}
+
+// Ruta para ejecutar la prueba con OpenAI y verificar criterios de diseño
 app.post("/run-test", async (req, res) => {
   const { project } = req.body;
 
   let success = false;
+  let criteriaResult = null;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -37,24 +82,22 @@ app.post("/run-test", async (req, res) => {
 
       const generatedCode = response.choices[0].message.content;
       console.log("Respuesta de OpenAI:", generatedCode);
+
       // Ejecutar el código generado por OpenAI
       await eval(generatedCode);
+
+      // Verificar criterios de diseño después de ejecutar el código
+      criteriaResult = await checkDesignCriteria(project.webLink);
 
       success = true;
       break; // Salir del bucle si la prueba es exitosa
     } catch (error) {
-      console.error(
-        `Error al ejecutar la prueba en el intento ${attempt}: `,
-        error
-      );
+      console.error(`Error al ejecutar la prueba en el intento ${attempt}: `, error);
       if (attempt === MAX_ATTEMPTS) {
-        res
-          .status(500)
-          .json({
-            success: false,
-            error:
-              "Hubo un error al ejecutar la prueba después de múltiples intentos, intenta de nuevo o cambia tus parámetros",
-          });
+        res.status(500).json({
+          success: false,
+          error: "Hubo un error al ejecutar la prueba después de múltiples intentos, intenta de nuevo o cambia tus parámetros",
+        });
       } else {
         // Esperar un tiempo antes del siguiente intento
         await new Promise((resolve) => setTimeout(resolve, 2000)); // Espera 2 segundos
@@ -63,10 +106,20 @@ app.post("/run-test", async (req, res) => {
   }
 
   if (success) {
-    res.status(200).json({ success: true });
+    // Mostrar los criterios cumplidos en el log
+    console.log("Criterios cumplidos:");
+    console.log(`Tamaño de letra: ${criteriaResult.fontSize}`);
+    console.log(`Tamaño de botones: ${JSON.stringify(criteriaResult.buttonSizes)}`);
+    console.log("Tamaños de letra para títulos:");
+    criteriaResult.headingSizes.forEach((size, index) => {
+      console.log(`  - Título ${index + 1}: ${size}px`);
+    });
+
+    res.status(200).json({ success: true, criteriaResult });
   }
 });
 
+// Iniciar el servidor
 app.listen(port, () => {
   console.log(`Servidor Node.js corriendo en http://localhost:${port}`);
 });
