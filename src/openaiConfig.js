@@ -11,3 +11,4 @@ const openai = new OpenAI({
 });
 
 module.exports = openai;
+  

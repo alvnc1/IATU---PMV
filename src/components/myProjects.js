@@ -9,8 +9,7 @@ import { MdDelete } from "react-icons/md";
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from "./firebase";
 import TestRunner from './testRunner'; // Importa el componente TestRunner
-import PDFButton from './PDFButton';
-import { generatePDF } from './PDFGenerator';
+import CriteriaPDFGenerator from './CriteriaPDFGenerator'; 
 
 function MyProjects() {
   const [projects, setProjects] = useState([]);
@@ -64,7 +63,6 @@ function MyProjects() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   return (
     <div>
       <NavBar />
@@ -110,11 +108,11 @@ function MyProjects() {
                     <td style={{ textAlign: "center" }}>
                       <div className="d-flex justify-content-between">
                         <TestRunner project={project} />
+                        <CriteriaPDFGenerator project={project} />
                         <Button variant="danger" style={{ fontSize: '10px', padding: '2px 5px' }} onClick={() => deleteProject(project.id)}> <MdDelete />Eliminar Proyecto</Button>
-                        <PDFButton onClick={generatePDF}></PDFButton>
                       </div>
                     </td>
-                  </tr> 
+                  </tr>
                 </React.Fragment>
               ))}
             </tbody>
