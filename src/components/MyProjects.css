@@ -1,0 +1,21 @@
+.neutral-btn {
+  background-color: #17884a;
+  border: none;
+  color: #333;
+  width: 100%;
+  text-align: center;
+}
+
+.neutral-btn:hover {
+  background-color: #17884a;
+  color: #111;
+}
+
+.danger-btn {
+  background-color: #dc3545; /* Color rojo de Bootstrap */
+  color: white;
+}
+
+.danger-btn:hover {
+  background-color: #c82333;
+}
