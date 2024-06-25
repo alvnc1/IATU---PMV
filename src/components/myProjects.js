@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import NavBar from "./navBar";
-import "../myProjects.module.css";
+import "../login-register.css";
 import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';

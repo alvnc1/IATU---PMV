@@ -16,6 +16,8 @@ const MAX_ATTEMPTS = 10;
 let storedCriteria = null;
 
 // Función para verificar criterios de diseño con Puppeteer
+// Función para verificar criterios de diseño con Puppeteer
+// Función para verificar criterios de diseño con Puppeteer
 async function checkDesignCriteria(webLink) {
   const browser = await puppeteer.launch();
   const page = await browser.newPage();
@@ -25,12 +27,20 @@ async function checkDesignCriteria(webLink) {
   const result = await page.evaluate(() => {
     const body = document.body;
 
-    // Ejemplo de verificación de tamaño de letra y espaciado entre líneas
+    // Obtener el tamaño de letra y espaciado entre líneas
     const bodyStyles = window.getComputedStyle(body);
     const fontSize = parseFloat(bodyStyles.getPropertyValue("font-size"));
     const lineHeight = parseFloat(bodyStyles.getPropertyValue("line-height"));
 
-    // Ejemplo de verificación de tamaño de letra para títulos
+    // Obtener botones y sus tamaños
+    const buttons = document.querySelectorAll("button");
+    const buttonSizes = [];
+    buttons.forEach((button) => {
+      const buttonRect = button.getBoundingClientRect();
+      buttonSizes.push({ width: buttonRect.width, height: buttonRect.height });
+    });
+
+    // Obtener tamaños de letra para títulos (h1 a h6)
     const headings = document.querySelectorAll("h1, h2, h3, h4, h5, h6");
     const headingSizes = [];
     headings.forEach((heading) => {
@@ -39,26 +49,47 @@ async function checkDesignCriteria(webLink) {
       headingSizes.push(headingFontSize);
     });
 
-    // Ejemplo de verificación de tamaño de botones
-    const buttons = document.querySelectorAll("button");
-    const buttonSizes = [];
-    buttons.forEach((button) => {
-      const buttonRect = button.getBoundingClientRect();
-      buttonSizes.push({ width: buttonRect.width, height: buttonRect.height });
-    });
+    // Función para calcular relación de contraste
+    function getContrastRatio(color1, color2) {
+      const lum1 = getRelativeLuminance(color1);
+      const lum2 = getRelativeLuminance(color2);
+      const ratio = (Math.max(lum1, lum2) + 0.05) / (Math.min(lum1, lum2) + 0.05);
+      return ratio.toFixed(2);
+    }
 
-    return {
-      fontSize: `${fontSize}px`,
-      lineHeight: lineHeight.toFixed(2),
-      headingSizes,
-      buttonSizes,
+    // Función para calcular luminancia relativa
+    function getRelativeLuminance(color) {
+      const rgb = color.match(/\d+/g);
+      const [r, g, b] = rgb.map((c) => {
+        let val = parseInt(c) / 255;
+        val = val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+        return val;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    // Verificar todos los criterios
+    const criteriaResult = {
+      fontSize: fontSize >= 14 ? `${fontSize}px` : 'No cumple el tamaño mínimo de 14px',
+      lineHeight: lineHeight >= 1.5 ? lineHeight.toFixed(2) : 'No cumple el espaciado mínimo de 1.5',
+      headingSizes: headingSizes.map(size => size >= 26 ? `${size}px` : `Título no cumple el tamaño mínimo de 26px`),
+      buttonSizes: buttonSizes.every(button => button.width >= 44 && button.height >= 44) ? buttonSizes : 'Al menos un botón no cumple el tamaño mínimo de 44x44 píxeles',
     };
+
+    // Agregar verificación de relación de contraste (ejemplo: verificar el color de fondo y texto)
+    const bodyColor = bodyStyles.getPropertyValue("color");
+    const bgColor = bodyStyles.getPropertyValue("background-color");
+    const contrastRatio = getContrastRatio(bodyColor, bgColor);
+    criteriaResult.contrastRatio = contrastRatio >= 7 ? contrastRatio : 'No cumple la relación de contraste mínima de 7:1';
+
+    return criteriaResult;
   });
 
   await browser.close();
 
   return result;
 }
+
 
 // Ruta para ejecutar la prueba con OpenAI y verificar criterios de diseño
 app.post("/run-test", async (req, res) => {
@@ -75,12 +106,26 @@ app.post("/run-test", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `para Puppeteer crea el código completo con {headless: false} (solo el código) para: ${project.inputValue}, en la web: ${project.webLink} y después de realizar las acciones requeridas, toma una captura de pantalla con el nombre ${project.id}. Por favor no uses la función waitforTimeout de Puppeteer.`,
+            content: `para Puppeteer crea el código completo con {headless: false} (solo el código) para: ${project.inputValue}, en la web: ${project.webLink} y después de realizar las acciones requeridas, toma una captura de pantalla con el nombre ${project.id}.`,
           },
         ],
         model: "gpt-3.5-turbo",
         max_tokens: 800,
       });
+
+      const url = await openai.chat.completions.create({
+        messages: [
+          {
+            role: "user",
+            content: `${project.inputValue} en ${project.webLink}$ que url debo usar? dame solo el url por favor y que sea válido`,
+          },
+        ],
+        model: "gpt-3.5-turbo",
+        max_tokens: 800,
+      });
+
+      const urlResponse = url.choices[0].message.content;
+      console.log("Link de OpenAI:", urlResponse);
 
       const generatedCode = response.choices[0].message.content;
       console.log("Respuesta de OpenAI:", generatedCode);
@@ -89,7 +134,7 @@ app.post("/run-test", async (req, res) => {
       await eval(generatedCode);
 
       // Verificar criterios de diseño después de ejecutar el código
-      criteriaResult = await checkDesignCriteria(project.webLink);
+      criteriaResult = await checkDesignCriteria(urlResponse);
 
       success = true;
       break; // Salir del bucle si la prueba es exitosa
