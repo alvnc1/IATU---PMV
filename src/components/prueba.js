@@ -1,6 +1,7 @@
+// src/components/MyProjects.js
 import React, { useEffect, useState } from "react";
 import NavBar from "./navBar";
-import "../myProjects.module.css";
+import "../login-register.css";
 import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
@@ -10,8 +11,8 @@ import Modal from 'react-bootstrap/Modal';
 import { MdDelete } from "react-icons/md";
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from "./firebase";
-import TestRunner from './testRunner';
-import CriteriaPDFGenerator from './CriteriaPDFGenerator';
+import TestRunner from './testRunner'; // Importa el componente TestRunner
+import CriteriaPDFGenerator from './CriteriaPDFGenerator'; 
 import './MyProjects.css'; // Importa el archivo CSS para estilos adicionales
 
 function MyProjects() {
@@ -19,12 +20,13 @@ function MyProjects() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [sortOrder, setSortOrder] = useState('asc');
-  const [testStatus, setTestStatus] = useState({});
 
+  // Función para obtener los proyectos desde Firebase
   const getProjects = async () => {
     const projectsCollection = collection(db, 'proyectos');
     const snapshot = await getDocs(projectsCollection);
     const projectsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Ordenar proyectos por fecha de creación
     projectsList.sort((a, b) => {
       if (sortOrder === 'asc') {
         return new Date(a.fechaCreacion) - new Date(b.fechaCreacion);
@@ -33,17 +35,13 @@ function MyProjects() {
       }
     });
     setProjects(projectsList);
-    const initialTestStatus = {};
-    projectsList.forEach(project => {
-      initialTestStatus[project.id] = false;
-    });
-    setTestStatus(initialTestStatus);
   };
 
+  // Función para eliminar un proyecto
   const deleteProject = async (projectId) => {
     try {
       await deleteDoc(doc(db, 'proyectos', projectId));
-      getProjects();
+      getProjects(); // Actualizar la lista de proyectos después de eliminar
       alert('Proyecto eliminado correctamente');
     } catch (error) {
       console.error('Error al eliminar el proyecto: ', error);
@@ -51,6 +49,7 @@ function MyProjects() {
     }
   };
 
+  // Función para obtener la información del usuario seleccionado
   const getUserInfo = (selectedOption) => {
     if (selectedOption === "opcion1") {
       return "Javier Sánchez, 32 años";
@@ -75,20 +74,15 @@ function MyProjects() {
     setShowModal(false);
   };
 
-  const handleTestRun = (projectId) => {
-    setTestStatus(prevStatus => ({
-      ...prevStatus,
-      [projectId]: true
-    }));
-  };
-
   useEffect(() => {
     getProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div>
       <NavBar />
+
       <Container
         style={{
           marginTop: "20px",
@@ -108,10 +102,10 @@ function MyProjects() {
         </div>
         <div style={{ marginTop: '20px' }}>
           <Row>
-            {projects.map((project) => (
+            {projects.map((project, index) => (
               <Col key={project.id} xs={12} sm={6} md={4} lg={3} className="mb-4">
                 <Card className="project-card">
-                  <Card.Img variant="top" src={require("./images/jaja.png")} alt="Project Image" />
+                  <Card.Img variant="top" src="https://via.placeholder.com/150" alt="Project Image" />
                   <Card.Body className="text-center">
                     <Card.Title>{project.nombreProyecto}</Card.Title>
                     <Button variant="primary" onClick={() => handleShowModal(project)}>View Project</Button>
@@ -141,9 +135,9 @@ function MyProjects() {
             <p><strong>Sitio Web:</strong> <a href={selectedProject.webLink} target="_blank" rel="noopener noreferrer">{selectedProject.webLink}</a></p>
             <p><strong>Fecha de creación:</strong> {new Date(selectedProject.fechaCreacion).toLocaleDateString()}</p>
             <div className="d-flex flex-column align-items-stretch">
-              <Button variant="light" className="neutral-btn mb-2"><TestRunner project={selectedProject} /></Button>
-              <Button variant="light" className="neutral-btn mb-2" disabled={!testStatus[selectedProject.id]}><CriteriaPDFGenerator project={selectedProject} /></Button>
-              <Button variant="danger" className="neutral-btn danger-btn" onClick={() => deleteProject(selectedProject.id)}> <MdDelete /> Eliminar Proyecto</Button>
+              <Button variant="info" className="mb-2"><TestRunner project={selectedProject} /></Button>
+              <Button variant="secondary" className="mb-2"><CriteriaPDFGenerator project={selectedProject} /></Button>
+              <Button variant="danger" onClick={() => deleteProject(selectedProject.id)}> <MdDelete /> Eliminar Proyecto</Button>
             </div>
           </Modal.Body>
         </Modal>
