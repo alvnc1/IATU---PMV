@@ -8,7 +8,7 @@ import { db } from "./firebase";
 import { doc, setDoc } from "firebase/firestore";
 
 
-function NewProject() {
+function NewTask() {
     const [selectedOption, setSelectedOption] = useState('');
     const [inputValue, setInputValue] = useState('');
     const [tipoInput, setTipoInput] = useState('enlace');
@@ -99,7 +99,7 @@ function NewProject() {
                 }}
             >
                 <div className="d-flex justify-content-between align-items-center">
-                    <h2 style={{ textAlign: "left", margin: 0 }}>Creación de Proyecto</h2>
+                    <h2 style={{ textAlign: "left", margin: 0 }}>Creación de Tarea</h2>
                 </div>
                 <hr
                     style={{
@@ -108,75 +108,42 @@ function NewProject() {
                         height: 5
                     }}
                 />
-                <div className="d-flex justify-content-between align-items-center">
-                    <h5 style={{ textAlign: "left", marginTop: '20px' }}>Nombre del Proyecto</h5>
-                </div>
-                <Form.Group controlId="formBasicNombreProyecto">
-                        <Form.Control
-                            type="text"
-                            placeholder="Escribe el nombre del proyecto..."
-                            value={nombreProyecto}
-                            onChange={handleNombreProyectoChange}
-                        />
-                    </Form.Group>
+                        <div className="d-flex justify-content-between align-items-center">
+                            <h5 style={{ textAlign: "left", marginTop: '20px' }}>Seleccione el usuario</h5>
+                        </div>
+                        <Form.Group controlId="formBasicDropdown">
+                                                <Form.Control as="select" value={selectedOption} onChange={handleSelectChange}>
+                                                    <option value="">Seleccione...</option>
+                                                    <option value="opcion1">Javier Sánchez, 32 años: Apasionado por la tecnología.</option>
+                                                    <option value="opcion2">José Gómez, 68 años: Entusiasta del arte contemporáneo.</option>
+                                                </Form.Control>
+                                            </Form.Group>
 
-                <div className="d-flex justify-content-between align-items-center">
-                <h5 style={{ textAlign: "left", marginTop: '20px' }}>Descripción del Proyecto</h5>
-                </div>
-                    <Form.Group controlId="formBasicNombreProyecto">
-                        <Form.Control
-                            type="text"
-                            placeholder="Da una breve descripción del proyecto..."
-                            value={nombreProyecto}
-                            onChange={handleDescripcionProyectoChange}
-                        />
-                    </Form.Group>
-                
-                <Form onSubmit={handleSubmit}>
-                    <div className="d-flex justify-content-between align-items-center">
-                        <h5 style={{ textAlign: "left", marginTop: '20px' }}>Recurso/s a Testear</h5>
-                    </div>
+                        <div className="d-flex justify-content-between align-items-center">
+                            <h5 style={{ textAlign: "left", marginTop: '20px' ,marginBottom:'-10px'}}>Defina la prueba a realizar en lenguaje natural</h5>
+                        </div>
+                        <Form.Group controlId="formBasicText">
+                                                <Form.Label></Form.Label>
+                                                <Form.Control
+                                                    type="text"
+                                                    placeholder="Escriba en lenguaje natural la prueba a realizar..."
+                                                    value={inputValue}
+                                                    onChange={handleInputChange}
+                                                />
+                                            </Form.Group>
 
-                    <Form.Group controlId="formBasicTipoInput">
-                        <Form.Label>Tipo de recurso</Form.Label>
-                        <Form.Control as="select" value={tipoInput} onChange={handleTipoInputChange}>
-                            <option value="enlace">Enlace Web</option>
-                            <option value="imagen">Imagen</option>
-                        </Form.Control>
-                    </Form.Group>
 
-                    {tipoInput === 'enlace' && (
-                        <Form.Group style={{ marginTop: '10px' }} controlId="formBasicWebLink">
-                            <Form.Control
-                                type="text"
-                                placeholder="Escribe el enlace de tu web..."
-                                value={webLink}
-                                onChange={handleWebLinkChange}
-                            />
-                        </Form.Group>
-                    )}
-
-                    {tipoInput === 'imagen' && (
-                        <Form.Group controlId="formBasicImageUpload" style={{ marginTop: '10px' }}>
-                            <Form.Control type="file" id="custom-file"
-                                label="Selecciona un archivo"
-                                custom
-                                onChange={handleFileChange} />
-
-                        </Form.Group>
-                    )}
 
 
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
                         <Button variant="primary" type="submit">
-                            Guardar Proyecto
+                            Guardar tarea
                         </Button>
                     </div>
-                </Form>
             </Container>
         </div>
 
     );
 }
 
-export default NewProject;
+export default NewTask;

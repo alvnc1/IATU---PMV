@@ -10,6 +10,8 @@ import "react-toastify/dist/ReactToastify.css";
 import { auth } from "./components/firebase";
 import MyProjects from "./components/myProjects";
 import NewProject from "./components/newProject";
+import ProjectPage from './components/projectpage';
+import NewTask from "./components/newtask";
 
 
 function App() {
@@ -32,6 +34,8 @@ function App() {
             <Route path="/register" element={<SignUp />} />
             <Route path="/projects" element={<MyProjects />} />
             <Route path="/newproject" element={<NewProject />} />
+            <Route path="/project/:id" element={<ProjectPage />} />
+            <Route path="/newtask" element={<NewTask />} />
           </Routes>
           <ToastContainer />
         </ConditionalWrapper> 
