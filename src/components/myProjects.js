@@ -1,26 +1,24 @@
-// src/components/MyProjects.js
 import React, { useEffect, useState } from "react";
 import NavBar from "./navBar";
-import "../login-register.css";
+import "../myProjects.module.css";
 import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
 import { MdDelete } from "react-icons/md";
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from "./firebase";
-import TestRunner from './testRunner'; // Importa el componente TestRunner
+import TestRunner from './testRunner';
 import CriteriaPDFGenerator from './CriteriaPDFGenerator'; 
 
 function MyProjects() {
   const [projects, setProjects] = useState([]);
   const [sortOrder, setSortOrder] = useState('asc');
+  const [testStatus, setTestStatus] = useState({}); // Nuevo estado para el estado de las pruebas
 
-  // Función para obtener los proyectos desde Firebase
   const getProjects = async () => {
     const projectsCollection = collection(db, 'proyectos');
     const snapshot = await getDocs(projectsCollection);
     const projectsList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    // Ordenar proyectos por fecha de creación
     projectsList.sort((a, b) => {
       if (sortOrder === 'asc') {
         return new Date(a.fechaCreacion) - new Date(b.fechaCreacion);
@@ -29,13 +27,17 @@ function MyProjects() {
       }
     });
     setProjects(projectsList);
+    const initialTestStatus = {};
+    projectsList.forEach(project => {
+      initialTestStatus[project.id] = false;
+    });
+    setTestStatus(initialTestStatus);
   };
 
-  // Función para eliminar un proyecto
   const deleteProject = async (projectId) => {
     try {
       await deleteDoc(doc(db, 'proyectos', projectId));
-      getProjects(); // Actualizar la lista de proyectos después de eliminar
+      getProjects();
       alert('Proyecto eliminado correctamente');
     } catch (error) {
       console.error('Error al eliminar el proyecto: ', error);
@@ -43,7 +45,6 @@ function MyProjects() {
     }
   };
 
-  // Función para obtener la información del usuario seleccionado
   const getUserInfo = (selectedOption) => {
     if (selectedOption === "opcion1") {
       return "Javier Sánchez, 32 años";
@@ -58,15 +59,20 @@ function MyProjects() {
     setSortOrder(prevSortOrder => prevSortOrder === 'asc' ? 'desc' : 'asc');
   };
 
+  const handleTestRun = (projectId) => {
+    setTestStatus(prevStatus => ({
+      ...prevStatus,
+      [projectId]: true
+    }));
+  };
+
   useEffect(() => {
     getProjects();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div>
       <NavBar />
-
       <Container
         style={{
           marginTop: "20px",
@@ -107,8 +113,8 @@ function MyProjects() {
                     <td>{new Date(project.fechaCreacion).toLocaleDateString()}</td>
                     <td style={{ textAlign: "center" }}>
                       <div className="d-flex justify-content-between">
-                        <TestRunner project={project} />
-                        <CriteriaPDFGenerator project={project} />
+                        <TestRunner project={project} onTestRun={() => handleTestRun(project.id)} />
+                        <CriteriaPDFGenerator project={project} disabled={!testStatus[project.id]} />
                         <Button variant="danger" style={{ fontSize: '10px', padding: '2px 5px' }} onClick={() => deleteProject(project.id)}> <MdDelete />Eliminar Proyecto</Button>
                       </div>
                     </td>

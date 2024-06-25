@@ -5,7 +5,7 @@
 }
 
 body {
-  background: linear-gradient(135deg, #1B8AF1, #ffffff);
+  background: #f7f9fb;
   min-height: 100vh;
   display: flex;
   font-weight: 400;

@@ -1,5 +1,3 @@
-// server.js (Node.js)
-
 const express = require("express");
 const puppeteer = require("puppeteer");
 const openai = require("./src/openaiConfig"); // Asegúrate de tener tu configuración de OpenAI adecuada aquí
@@ -13,6 +11,9 @@ app.use(cors());
 app.use(express.json());
 
 const MAX_ATTEMPTS = 10;
+
+// Variable global para almacenar los criterios obtenidos
+let storedCriteria = null;
 
 // Función para verificar criterios de diseño con Puppeteer
 async function checkDesignCriteria(webLink) {
@@ -116,6 +117,9 @@ app.post("/run-test", async (req, res) => {
       console.log(`  - Título ${index + 1}: ${size}px`);
     });
 
+    // Guardar los criterios en la variable global
+    storedCriteria = criteriaResult;
+
     res.status(200).json({ success: true, criteriaResult });
   }
 });
@@ -123,16 +127,11 @@ app.post("/run-test", async (req, res) => {
 // Ruta para obtener los criterios de diseño después de la prueba
 app.get("/criteria", async (req, res) => {
   try {
-    // Aquí puedes devolver los criterios almacenados o calcularlos nuevamente si es necesario
-    // En este ejemplo, devolvemos un objeto de ejemplo para mostrar el formato
-    const exampleCriteria = {
-      fontSize: "16px",
-      lineHeight: "1.5",
-      headingSizes: [24, 20, 18],
-      buttonSizes: [{ width: 120, height: 40 }, { width: 100, height: 36 }],
-    };
-
-    res.status(200).json(exampleCriteria);
+    if (storedCriteria) {
+      res.status(200).json(storedCriteria);
+    } else {
+      res.status(404).json({ error: 'No hay criterios almacenados. Por favor, ejecuta la prueba primero.' });
+    }
   } catch (error) {
     console.error('Error al obtener los criterios:', error);
     res.status(500).json({ error: 'Hubo un error al obtener los criterios' });
