@@ -35,7 +35,7 @@ function App() {
             <Route path="/projects" element={<MyProjects />} />
             <Route path="/newproject" element={<NewProject />} />
             <Route path="/project/:id" element={<ProjectPage />} />
-            <Route path="/newtask" element={<NewTask />} />
+            <Route path="/newtask/:id" element={<NewTask />} />
           </Routes>
           <ToastContainer />
         </ConditionalWrapper> 

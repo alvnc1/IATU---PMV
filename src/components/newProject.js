@@ -52,11 +52,7 @@ function NewProject() {
             // Objeto con los datos a guardar
             const proyecto = {
                 nombreProyecto,
-                selectedOption,
-                inputValue,
-                tipoInput,
-                webLink,
-                imagenFile: imagenFile ? imagenFile.name : null,
+                descripcionProyecto,
                 fechaCreacion: new Date().toISOString() // Guardar la fecha de creación en formato ISO
             };
 
@@ -123,11 +119,11 @@ function NewProject() {
                 <div className="d-flex justify-content-between align-items-center">
                 <h5 style={{ textAlign: "left", marginTop: '20px' }}>Descripción del Proyecto</h5>
                 </div>
-                    <Form.Group controlId="formBasicNombreProyecto">
+                    <Form.Group controlId="formBasicDescripcionProyecto">
                         <Form.Control
                             type="text"
                             placeholder="Da una breve descripción del proyecto..."
-                            value={nombreProyecto}
+                            value={descripcionProyecto}
                             onChange={handleDescripcionProyectoChange}
                         />
                     </Form.Group>

@@ -115,6 +115,7 @@ function MyProjects() {
                   <Card.Img variant="top" src={require("./images/logo.png")} alt="Project Image" />
                   <Card.Body className="text-center">
                     <Card.Title>{project.nombreProyecto}</Card.Title>
+                    <Card.Title>{project.descripcionProyecto}</Card.Title>
                     <Button variant="primary" onClick={() => navigate(`/project/${project.id}`)}>View Project</Button>
                   </Card.Body>
                 </Card>
