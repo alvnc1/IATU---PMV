@@ -146,7 +146,7 @@ function ProjectPage() {
             <div className="d-flex flex-column align-items-stretch">
               <Button variant="light" className="neutral-btn mb-2"><TestRunner project={selectedProject} /></Button>
               <Button variant="light" className="neutral-btn mb-2" disabled={!testStatus[selectedProject.id]}><CriteriaPDFGenerator project={selectedProject} /></Button>
-              <Button variant="danger" className="neutral-btn danger-btn" onClick={() => deleteProject(selectedProject.id)}> <MdDelete /> Eliminar Proyecto</Button>
+              <Button variant="danger" className="neutral-btn danger-btn" onClick={() => deleteProject(selectedProject.id)}> <MdDelete /> Eliminar Tarea</Button>
             </div>
           </Modal.Body>
         </Modal>
