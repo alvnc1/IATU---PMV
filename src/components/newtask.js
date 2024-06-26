@@ -13,6 +13,7 @@ function NewTask() {
     const [selectedOption, setSelectedOption] = useState('');
     const [inputValue, setInputValue] = useState('');
     const [nombreTarea, setNombreTarea] = useState('');
+    const [errors, setErrors] = useState({});
 
     const handleSelectChange = (e) => {
         setSelectedOption(e.target.value);
@@ -26,8 +27,23 @@ function NewTask() {
         setNombreTarea(e.target.value);
     };
 
+    const validate = () => {
+        const errors = {};
+        if (!nombreTarea) errors.nombreTarea = "El nombre de la tarea es obligatorio.";
+        if (!selectedOption) errors.selectedOption = "Debe seleccionar un usuario.";
+        if (!inputValue) errors.inputValue = "Debe definir la prueba a realizar.";
+
+        setErrors(errors);
+        return Object.keys(errors).length === 0;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        if (!validate()) {
+            return;
+        }
+
         try {
             // Verifica que projectId no esté vacío
             if (!projectId) {
@@ -98,18 +114,30 @@ function NewTask() {
                         placeholder="Escribe el nombre de la tarea..."
                         value={nombreTarea}
                         onChange={handleNombreTareaChange}
+                        isInvalid={!!errors.nombreTarea}
                     />
+                    <Form.Control.Feedback type="invalid">
+                        {errors.nombreTarea}
+                    </Form.Control.Feedback>
                 </Form.Group>
                 
                 <div className="d-flex justify-content-between align-items-center">
                     <h5 style={{ textAlign: "left", marginTop: '20px' }}>Seleccione el usuario</h5>
                 </div>
                 <Form.Group controlId="formBasicDropdown">
-                    <Form.Control as="select" value={selectedOption} onChange={handleSelectChange}>
+                    <Form.Control 
+                        as="select" 
+                        value={selectedOption} 
+                        onChange={handleSelectChange} 
+                        isInvalid={!!errors.selectedOption}
+                    >
                         <option value="">Seleccione...</option>
                         <option value="opcion1">Javier Sánchez, 32 años: Apasionado por la tecnología.</option>
                         <option value="opcion2">José Gómez, 68 años: Entusiasta del arte contemporáneo.</option>
                     </Form.Control>
+                    <Form.Control.Feedback type="invalid">
+                        {errors.selectedOption}
+                    </Form.Control.Feedback>
                 </Form.Group>
 
                 <div className="d-flex justify-content-between align-items-center">
@@ -122,7 +150,11 @@ function NewTask() {
                         placeholder="Escriba en lenguaje natural la prueba a realizar..."
                         value={inputValue}
                         onChange={handleInputChange}
+                        isInvalid={!!errors.inputValue}
                     />
+                    <Form.Control.Feedback type="invalid">
+                        {errors.inputValue}
+                    </Form.Control.Feedback>
                 </Form.Group>
 
                 <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
