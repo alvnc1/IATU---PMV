@@ -14,7 +14,17 @@
 .danger-btn {
   background-color: #dc3545; /* Color rojo de Bootstrap */
   color: white;
+  border: none; /* Elimina el borde */
+  padding: 0.375rem; /* Reduce el relleno alrededor del ícono */
+  display: inline-flex; /* Hace que el contenedor del botón sea flexible en línea */
+  align-items: center; /* Alinea los íconos verticalmente */
+  justify-content: center; /* Centra el ícono horizontalmente */
+  width: 36px; /* Ajusta el ancho del botón */
+  height: 36px; /* Ajusta la altura del botón */
+  margin-left: 80px; /* Añade espacio a la izquierda del botón */
 }
+
+
 
 .danger-btn:hover {
   background-color: #c82333;
