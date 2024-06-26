@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import NavBar from "./navBar";
 import "../login-register.css";
+import { useNavigate } from 'react-router-dom';
 import Container from "react-bootstrap/Container";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
@@ -14,6 +15,7 @@ function NewTask() {
     const [inputValue, setInputValue] = useState('');
     const [nombreTarea, setNombreTarea] = useState('');
     const [errors, setErrors] = useState({});
+    const navigate = useNavigate(); // Crear instancia de useNavigate
 
     const handleSelectChange = (e) => {
         setSelectedOption(e.target.value);
@@ -71,6 +73,7 @@ function NewTask() {
             console.log("Tarea guardada en Firebase:", tarea);
 
             alert("Tarea guardada correctamente!");
+            navigate(`/project/${projectId}`)
         } catch (error) {
             console.error("Error al guardar la tarea en Firebase: ", error);
             alert("Hubo un error al guardar la tarea");
