@@ -12,30 +12,30 @@ import { db } from "./firebase";
 import TestRunner from './testRunner';
 import CriteriaPDFGenerator from './CriteriaPDFGenerator';
 import './MyProjects.css'; // Importa el archivo CSS para estilos adicionales
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 
 function ProjectPage() {
-  const { id: projectId } = useParams();
-  const [project, setProject] = useState(null);
+  const { id } = useParams();
   const [tasks, setTasks] = useState([]);
-  const [showModal, setShowModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [sortOrder, setSortOrder] = useState('asc');
   const [testStatus, setTestStatus] = useState({});
-
   const navigate = useNavigate();
 
-  const getProject = async () => {
-    const projectDoc = doc(db, 'proyectos', projectId);
-    const projectSnapshot = await getDocs(projectDoc);
-    setProject({ id: projectSnapshot.id, ...projectSnapshot.data() });
-  };
-
   const getTasks = async () => {
-    const tasksCollection = collection(db, 'proyectos', projectId, 'tasks');
+    const tasksCollection = collection(db, 'proyectos', id, 'tasks');
     const snapshot = await getDocs(tasksCollection);
     const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    tasksList.sort((a, b) => {
+      if (sortOrder === 'asc') {
+        return new Date(a.fechaCreacion) - new Date(b.fechaCreacion);
+      } else {
+        return new Date(b.fechaCreacion) - new Date(a.fechaCreacion);
+      }
+    });
     setTasks(tasksList);
-
     const initialTestStatus = {};
     tasksList.forEach(task => {
       initialTestStatus[task.id] = false;
@@ -45,7 +45,7 @@ function ProjectPage() {
 
   const deleteTask = async (taskId) => {
     try {
-      await deleteDoc(doc(db, 'proyectos', projectId, 'tasks', taskId));
+      await deleteDoc(doc(db, 'proyectos', id, 'tasks', taskId));
       getTasks();
       alert('Tarea eliminada correctamente');
     } catch (error) {
@@ -62,6 +62,10 @@ function ProjectPage() {
     } else {
       return "Usuario no especificado";
     }
+  };
+
+  const handleSortByDate = () => {
+    setSortOrder(prevSortOrder => prevSortOrder === 'asc' ? 'desc' : 'asc');
   };
 
   const handleShowModal = (task) => {
@@ -82,7 +86,6 @@ function ProjectPage() {
   };
 
   useEffect(() => {
-    getProject();
     getTasks();
   }, []);
 
@@ -103,22 +106,29 @@ function ProjectPage() {
         }}
       >
         <div className="d-flex justify-content-between align-items-center">
-          <h2 style={{ textAlign: "left", margin: 0 }}>Proyecto {project && project.nombreProyecto}</h2>
-          <Button href={`/newtask/${projectId}`} style={{ height: '50px', padding: '12px', fontSize: '14px' }} variant="primary"> Agregar Tarea</Button>
+          <h2 style={{ textAlign: "left", margin: 0 }}>Proyecto {id}</h2>
+          <Button href={`/newtask/${id}`} style={{ height: '50px', padding: '12px', fontSize: '14px' }} variant="primary"> Agregar Prueba</Button>
         </div>
         <div style={{ marginTop: '20px' }}>
           <Row>
             {tasks.map((task) => (
               <Col key={task.id} xs={12} sm={6} md={4} lg={3} className="mb-4">
-                <Card className="task-card">
+                <Card className="project-card">
+                  <Card.Img variant="top" src={require("./images/logo.png")} alt="Task Image" />
                   <Card.Body className="text-center">
                     <Card.Title>{task.nombreTarea}</Card.Title>
-                    <Card.Text>{task.inputValue}</Card.Text>
-                    <Button variant="primary" onClick={() => handleShowModal(task)}>Ver Detalles</Button>
+                    <Button variant="primary" onClick={() => handleShowModal(task)}>Ver Tarea</Button>
                   </Card.Body>
                 </Card>
               </Col>
             ))}
+            <Col xs={12} sm={6} md={4} lg={3} className="mb-4">
+              <Card className="h-100 d-flex justify-content-center align-items-center">
+                <Button href={`/newtask/${id}`} variant="outline-primary" className="w-100 h-100">
+                  + Nueva Tarea
+                </Button>
+              </Card>
+            </Col>
           </Row>
         </div>
       </Container>
@@ -132,15 +142,9 @@ function ProjectPage() {
             <p><strong>Usuario:</strong> {getUserInfo(selectedTask.selectedOption)}</p>
             <p><strong>Descripción:</strong> {selectedTask.inputValue}</p>
             <div className="d-flex flex-column align-items-stretch">
-              <Button variant="light" className="neutral-btn mb-2" onClick={() => handleTestRun(selectedTask.id)}>
-                <TestRunner task={selectedTask} />
-              </Button>
-              <Button variant="light" className="neutral-btn mb-2" disabled={!testStatus[selectedTask.id]}>
-                <CriteriaPDFGenerator task={selectedTask} />
-              </Button> 
-              <Button variant="danger" className="neutral-btn danger-btn" onClick={() => deleteTask(selectedTask.id)}>
-                <MdDelete /> Eliminar Tarea
-              </Button>
+              <Button variant="light" className="neutral-btn mb-2"><TestRunner task={selectedTask} /></Button>
+              <Button variant="light" className="neutral-btn mb-2" disabled={!testStatus[selectedTask.id]}><CriteriaPDFGenerator task={selectedTask} /></Button>
+              <Button variant="danger" className="neutral-btn danger-btn" onClick={() => deleteTask(selectedTask.id)}> <MdDelete /> Eliminar Tarea</Button>
             </div>
           </Modal.Body>
         </Modal>
