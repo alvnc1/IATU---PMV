@@ -105,7 +105,6 @@ function MyProjects() {
       >
         <div className="d-flex justify-content-between align-items-center">
           <h2 style={{ textAlign: "left", margin: 0 }}>Mis Proyectos</h2>
-          <Button href='./newproject' style={{ height: '50px', padding: '12px', fontSize: '14px' }} variant="primary"> Nuevo Proyecto</Button>
         </div>
         <div style={{ marginTop: '20px' }}>
           <Row>
@@ -124,7 +123,7 @@ function MyProjects() {
             <Col xs={12} sm={6} md={4} lg={3} className="mb-4">
               <Card className="h-100 d-flex justify-content-center align-items-center">
                 <Button href='./newproject' variant="outline-primary" className="w-100 h-100">
-                  + New Project
+                  + Nuevo Proyecto
                 </Button>
               </Card>
             </Col>

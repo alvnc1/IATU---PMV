@@ -107,7 +107,6 @@ function ProjectPage() {
       >
         <div className="d-flex justify-content-between align-items-center">
           <h2 style={{ textAlign: "left", margin: 0 }}>Proyecto {id}</h2>
-          <Button href={`/newtask/${id}`} style={{ height: '50px', padding: '12px', fontSize: '14px' }} variant="primary"> Agregar Prueba</Button>
         </div>
         <div style={{ marginTop: '20px' }}>
           <Row>
