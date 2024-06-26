@@ -16,8 +16,6 @@ const MAX_ATTEMPTS = 10;
 let storedCriteria = null;
 
 // Función para verificar criterios de diseño con Puppeteer
-// Función para verificar criterios de diseño con Puppeteer
-// Función para verificar criterios de diseño con Puppeteer
 async function checkDesignCriteria(webLink) {
   const browser = await puppeteer.launch();
   const page = await browser.newPage();

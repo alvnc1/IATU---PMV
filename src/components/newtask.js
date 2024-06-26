@@ -9,10 +9,10 @@ import { doc, setDoc, collection } from "firebase/firestore";
 import { useParams } from 'react-router-dom';
 
 function NewTask() {
-    const projectId = useParams(); // Obtener el ID del proyecto desde la URL
+    const { id: projectId } = useParams(); // Obtener el ID del proyecto desde la URL
     const [selectedOption, setSelectedOption] = useState('');
     const [inputValue, setInputValue] = useState('');
-    const [nombreTarea, setnombreTarea] = useState('');
+    const [nombreTarea, setNombreTarea] = useState('');
 
     const handleSelectChange = (e) => {
         setSelectedOption(e.target.value);
@@ -22,18 +22,24 @@ function NewTask() {
         setInputValue(e.target.value);
     };
 
-
     const handleNombreTareaChange = (e) => {
-        setnombreTarea(e.target.value);
+        setNombreTarea(e.target.value);
     };
 
-    console.log("ID", projectId);
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            // Verifica que projectId no esté vacío
+            if (!projectId) {
+                alert("Error: No se pudo obtener el ID del proyecto.");
+                return;
+            }
+
             // Objeto con los datos a guardar
             const tarea = {
-                nombreTarea
+                nombreTarea,
+                selectedOption,
+                inputValue
             };
 
             // Guardar documento en Firestore dentro de la colección tasks del proyecto específico
@@ -43,6 +49,7 @@ function NewTask() {
             // Limpiar los campos después de guardar
             setSelectedOption('');
             setInputValue('');
+            setNombreTarea('');
 
             // Mostrar los datos en la consola
             console.log("Tarea guardada en Firebase:", tarea);
@@ -85,14 +92,14 @@ function NewTask() {
                 <div className="d-flex justify-content-between align-items-center">
                     <h5 style={{ textAlign: "left", marginTop: '20px' }}>Nombre de la tarea</h5>
                 </div>
-                <Form.Group controlId="formBasicNombreProyecto">
-                        <Form.Control
-                            type="text"
-                            placeholder="Escribe el nombre del proyecto..."
-                            value={nombreTarea}
-                            onChange={handleNombreTareaChange}
-                        />
-                    </Form.Group>
+                <Form.Group controlId="formBasicNombreTarea">
+                    <Form.Control
+                        type="text"
+                        placeholder="Escribe el nombre de la tarea..."
+                        value={nombreTarea}
+                        onChange={handleNombreTareaChange}
+                    />
+                </Form.Group>
                 
                 <div className="d-flex justify-content-between align-items-center">
                     <h5 style={{ textAlign: "left", marginTop: '20px' }}>Seleccione el usuario</h5>
