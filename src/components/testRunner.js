@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from 'react-bootstrap';
 import { IoMdPlayCircle } from 'react-icons/io';
 
-const TestRunner = ({ project, onTestRun }) => {
+const TestRunner = ({ task, onTestRun }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [responseText, setResponseText] = useState('');
@@ -11,12 +11,18 @@ const TestRunner = ({ project, onTestRun }) => {
     setLoading(true);
 
     try {
+      if (!task) {
+        setError('No se ha proporcionado una tarea válida.');
+        return;
+      }
+
+      // Aquí se realiza la llamada a la API para ejecutar la prueba
       const response = await fetch('http://localhost:3001/run-test', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ project }),
+        body: JSON.stringify({ project: task }), // Usar task en lugar de project
       });
 
       const data = await response.json();

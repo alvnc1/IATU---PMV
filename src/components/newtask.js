@@ -16,9 +16,25 @@ function NewTask() {
     const [nombreTarea, setNombreTarea] = useState('');
     const [errors, setErrors] = useState({});
     const navigate = useNavigate(); // Crear instancia de useNavigate
+    const [tipoInput, setTipoInput] = useState('enlace');
+    const [webLink, setWebLink] = useState('');
+    const [imagenFile, setImagenFile] = useState(null);
 
     const handleSelectChange = (e) => {
         setSelectedOption(e.target.value);
+    };
+
+    const handleWebLinkChange = (e) => {
+        setWebLink(e.target.value);
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        setImagenFile(file);
+    };
+
+    const handleTipoInputChange = (e) => {
+        setTipoInput(e.target.value);
     };
 
     const handleInputChange = (e) => {
@@ -57,7 +73,8 @@ function NewTask() {
             const tarea = {
                 nombreTarea,
                 selectedOption,
-                inputValue
+                inputValue,
+                webLink
             };
 
             // Guardar documento en Firestore dentro de la colección tasks del proyecto específico
@@ -123,7 +140,44 @@ function NewTask() {
                         {errors.nombreTarea}
                     </Form.Control.Feedback>
                 </Form.Group>
-                
+
+                <Form onSubmit={handleSubmit}>
+                    <div className="d-flex justify-content-between align-items-center">
+                        <h5 style={{ textAlign: "left", marginTop: '20px' }}>Recurso/s a Testear</h5>
+                    </div>
+
+                    <Form.Group controlId="formBasicTipoInput">
+                        <Form.Label>Tipo de recurso</Form.Label>
+                        <Form.Control as="select" value={tipoInput} onChange={handleTipoInputChange}>
+                            <option value="enlace">Enlace Web</option>
+                            <option value="imagen">Imagen</option>
+                        </Form.Control>
+                    </Form.Group>
+
+                    {tipoInput === 'enlace' && (
+                        <Form.Group style={{ marginTop: '10px' }} controlId="formBasicWebLink">
+                            <Form.Control
+                                type="text"
+                                placeholder="Escribe el enlace de tu web..."
+                                value={webLink}
+                                onChange={handleWebLinkChange}
+                            />
+                        </Form.Group>
+                    )}
+
+                    {tipoInput === 'imagen' && (
+                        <Form.Group controlId="formBasicImageUpload" style={{ marginTop: '10px' }}>
+                            <Form.Control
+                                type="file"
+                                id="custom-file"
+                                label="Selecciona un archivo"
+                                custom
+                                onChange={handleFileChange}
+                            />
+                        </Form.Group>
+                    )}
+                </Form>
+
                 <div className="d-flex justify-content-between align-items-center">
                     <h5 style={{ textAlign: "left", marginTop: '20px' }}>Seleccione el usuario</h5>
                 </div>
