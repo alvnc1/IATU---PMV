@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from 'react-router-dom';
 import NavBar from "./navBar";
 import "../login-register.css";
 import Container from "react-bootstrap/Container";
@@ -6,7 +7,6 @@ import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import { db } from "./firebase";
 import { doc, setDoc } from "firebase/firestore";
-
 
 function NewProject() {
     const [selectedOption, setSelectedOption] = useState('');
@@ -16,6 +16,7 @@ function NewProject() {
     const [imagenFile, setImagenFile] = useState(null);
     const [nombreProyecto, setNombreProyecto] = useState('');
     const [descripcionProyecto, setDescripcionProyecto] = useState('');
+    const navigate = useNavigate(); // Crear instancia de useNavigate
 
     const handleSelectChange = (e) => {
         setSelectedOption(e.target.value);
@@ -66,11 +67,15 @@ function NewProject() {
             setWebLink('');
             setImagenFile(null);
             setNombreProyecto('');
+            setDescripcionProyecto('');
 
             // Mostrar los datos en la consola
             console.log("Datos guardados en Firebase:", proyecto);
 
             alert("Proyecto guardado correctamente!");
+
+            // Redirigir a /projects
+            navigate('/projects');
         } catch (error) {
             console.error("Error al guardar proyecto en Firebase: ", error);
             alert("Hubo un error al guardar el proyecto");
@@ -108,25 +113,25 @@ function NewProject() {
                     <h5 style={{ textAlign: "left", marginTop: '20px' }}>Nombre del Proyecto</h5>
                 </div>
                 <Form.Group controlId="formBasicNombreProyecto">
-                        <Form.Control
-                            type="text"
-                            placeholder="Escribe el nombre del proyecto..."
-                            value={nombreProyecto}
-                            onChange={handleNombreProyectoChange}
-                        />
-                    </Form.Group>
+                    <Form.Control
+                        type="text"
+                        placeholder="Escribe el nombre del proyecto..."
+                        value={nombreProyecto}
+                        onChange={handleNombreProyectoChange}
+                    />
+                </Form.Group>
 
                 <div className="d-flex justify-content-between align-items-center">
-                <h5 style={{ textAlign: "left", marginTop: '20px' }}>Descripción del Proyecto</h5>
+                    <h5 style={{ textAlign: "left", marginTop: '20px' }}>Descripción del Proyecto</h5>
                 </div>
-                    <Form.Group controlId="formBasicDescripcionProyecto">
-                        <Form.Control
-                            type="text"
-                            placeholder="Da una breve descripción del proyecto..."
-                            value={descripcionProyecto}
-                            onChange={handleDescripcionProyectoChange}
-                        />
-                    </Form.Group>
+                <Form.Group controlId="formBasicDescripcionProyecto">
+                    <Form.Control
+                        type="text"
+                        placeholder="Da una breve descripción del proyecto..."
+                        value={descripcionProyecto}
+                        onChange={handleDescripcionProyectoChange}
+                    />
+                </Form.Group>
                 
                 <Form onSubmit={handleSubmit}>
                     <div className="d-flex justify-content-between align-items-center">
@@ -154,14 +159,15 @@ function NewProject() {
 
                     {tipoInput === 'imagen' && (
                         <Form.Group controlId="formBasicImageUpload" style={{ marginTop: '10px' }}>
-                            <Form.Control type="file" id="custom-file"
+                            <Form.Control
+                                type="file"
+                                id="custom-file"
                                 label="Selecciona un archivo"
                                 custom
-                                onChange={handleFileChange} />
-
+                                onChange={handleFileChange}
+                            />
                         </Form.Group>
                     )}
-
 
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
                         <Button variant="primary" type="submit">
@@ -171,7 +177,6 @@ function NewProject() {
                 </Form>
             </Container>
         </div>
-
     );
 }
 
