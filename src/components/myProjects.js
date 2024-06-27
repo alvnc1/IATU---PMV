@@ -115,8 +115,8 @@ function MyProjects() {
                   <Card.Body className="text-center">
                     <Card.Title>{project.nombreProyecto}</Card.Title>
                     <Card.Title>{project.descripcionProyecto}</Card.Title>
-                    <Button variant="primary" onClick={() => navigate(`/project/${project.id}`)}>Ver Proyecto</Button>
-                    <Button variant="danger" className="neutral-btn danger-btnMP" onClick={() => deleteProject(project.id)}>
+                    <Button variant="primary" className="mb-2" onClick={() => navigate(`/project/${project.id}`)}>Ver Proyecto</Button>
+                    <Button variant="danger" className="danger-btn mb-2" onClick={() => deleteProject(project.id)}>
                       <MdDelete size={24} />
                     </Button>
                   </Card.Body>

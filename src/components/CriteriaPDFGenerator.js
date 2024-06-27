@@ -68,6 +68,80 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
     if (task.selectedOption === "opcion1") {
       y += lineHeight;
       doc.text(`El usuario seleccionado es: ${getUserInfo(task.selectedOption)}`, margin, y);
+
+      // Parsear el objeto criteriaData si no está en formato JSON
+      const parsedCriteria = typeof criteriaData === 'string' ? JSON.parse(criteriaData) : criteriaData;
+
+      // Obtener el valor de fontSize y convertirlo a número
+      const fontSize = parseFloat(parsedCriteria.fontSize);
+
+      // Ejemplo de condición para comparar fontSize con 14px
+      if (!isNaN(fontSize) && fontSize > 12) {
+        y += lineHeight;
+        doc.text(`El tamaño de letra es mayor a 12px: ${parsedCriteria.fontSize} \nEl usuario puede reconocer comodamente el tamaño de letra\n`, margin, y);
+      }else{
+        y += lineHeight;
+        doc.text(`El tamaño de letra no es mayor a 12px: ${parsedCriteria.fontSize}\nEl usuario no puede reconocer comodamente el tamaño de letra\n`, margin, y);
+      }
+
+      // Obtener el valor de lineHeight y convertirlo a número
+      const lineHeightValue = parseFloat(parsedCriteria.lineHeight);
+
+      // Mostrar el lineHeight solo si es mayor a 1.5
+      if (!isNaN(lineHeightValue) && lineHeightValue > 1.3) {
+        y += lineHeight;
+        doc.text(`El line-height es mayor a 1.3 \nEl interlineado de la pagina es adecuada para este usuario`, margin, y);
+      } else {
+        y += lineHeight;
+        doc.text(`El line-height no es mayor a 1.3\nEl interlineado de la pagina no es adecuada para este usuario`, margin, y);
+      }
+      
+      // Obtener el valor de contrastRatio y mostrarlo si existe
+      const contrastRatio = parsedCriteria.contrastRatio;
+      if (contrastRatio !== undefined) {
+        y += lineHeight;
+        const parts = contrastRatio.toString().split('.');
+        const contrastPrint = contrastRatio.toString().replace('.',':');
+        const ratioDer = parseInt(parts[0], 10);
+        const ratioIzq = parseInt(parts[0], 10);
+        if(ratioDer >= 4.5 && ratioIzq >= 1){
+          doc.text(`La relacion de contraste de la pagina es de al menos 4.5:1: ${contrastPrint}\nLa relacion de contraste es comoda para el usuario`, margin, y);
+        } else {
+          doc.text(`La relacion de contraste de la pagina es menor a 4.5:1: ${contrastPrint}\nLa relacion de contraste no es comoda para el usuario`, margin, y);
+        }
+      }
+
+      // Verificar si headingSizes existe y es un array antes de intentar iterar sobre él
+      if (Array.isArray(parsedCriteria.headingSizes) && parsedCriteria.headingSizes.length > 0) {
+        y += lineHeight;
+        doc.text('Tamaños de encabezados:', margin, y);
+
+        parsedCriteria.headingSizes.forEach((headingSize, index) => {
+          y += lineHeight;
+          if (headingSize >= 24){
+            doc.text(`El tamaño del Encabezado ${index + 1} es de al menos 24pt: ${headingSize}\nEl usuario puede leer comodamente este encabezado`, margin, y);
+          } else{
+            doc.text(`El tamaño del Encabezado ${index + 1} es de menor a 24pt: ${headingSize}\nEl usuario no puede leer comodamente este encabezado`, margin, y);
+          }
+        });
+      } else {
+        y += lineHeight;
+        doc.text('No se encontraron tamaños de encabezados válidos', margin, y);
+      }
+
+      // Verificar si buttonSizes existe y es un array antes de intentar iterar sobre él
+      if (Array.isArray(parsedCriteria.buttonSizes) && parsedCriteria.buttonSizes.length > 0) {
+        y += lineHeight;
+        doc.text('Tamaños de botones:', margin, y);
+
+        parsedCriteria.buttonSizes.forEach((buttonSize, index) => {
+          y += lineHeight;
+          doc.text(`La dimension del Botón ${index + 1} es: ${buttonSize.width}x${buttonSize.height} píxeles`, margin, y);
+        });
+      } else {
+        y += lineHeight;
+        doc.text('No se encontraron tamaños de botones válidos', margin, y);
+      }
     }
 
     // Aplicar las condiciones solo si task.selectedOption es igual a "opcion2"
@@ -84,10 +158,10 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
       // Ejemplo de condición para comparar fontSize con 14px
       if (!isNaN(fontSize) && fontSize > 14) {
         y += lineHeight;
-        doc.text(`El tamaño de letra es mayor a 14px: ${parsedCriteria.fontSize}`, margin, y);
+        doc.text(`El tamaño de letra es mayor a 14px: ${parsedCriteria.fontSize}\nEl usuario puede reconocer comodamente el tamaño de letra`, margin, y);
       }else{
         y += lineHeight;
-        doc.text(`El tamaño de letra no es mayor a 14px: ${parsedCriteria.fontSize}`, margin, y);
+        doc.text(`El tamaño de letra no es mayor a 14px: ${parsedCriteria.fontSize}\nEl usuario no puede reconocer comodamente el tamaño de letra`, margin, y);
       }
 
       // Obtener el valor de lineHeight y convertirlo a número
@@ -96,17 +170,25 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
       // Mostrar el lineHeight solo si es mayor a 1.5
       if (!isNaN(lineHeightValue) && lineHeightValue > 1.5) {
         y += lineHeight;
-        doc.text(`El line-height es mayor a 1.5`, margin, y);
+        doc.text(`El line-height es mayor a 1.5\nEl interlineado de la pagina es adecuada para este usuario`, margin, y);
       } else {
         y += lineHeight;
-        doc.text(`El line-height no es mayor a 1.5`, margin, y);
+        doc.text(`El line-height no es mayor a 1.5\nEl interlineado de la pagina no es adecuada para este usuario`, margin, y);
       }
       
       // Obtener el valor de contrastRatio y mostrarlo si existe
       const contrastRatio = parsedCriteria.contrastRatio;
       if (contrastRatio !== undefined) {
         y += lineHeight;
-        doc.text(`Contrast Ratio: ${contrastRatio}`, margin, y);
+        const parts = contrastRatio.toString().split('.');
+        const contrastPrint = contrastRatio.toString().replace('.',':');
+        const ratioDer = parseInt(parts[0], 10);
+        const ratioIzq = parseInt(parts[0], 10);
+        if(ratioDer >= 7 && ratioIzq >= 1){
+          doc.text(`La relación de contraste de la pagina es de al menos 7:1: ${contrastPrint}\nLa relación de contraste es comoda para el usuario`, margin, y);
+        } else {
+          doc.text(`La relación de contraste de la pagina es menor a 7:1: ${contrastPrint}\nLa relación de contraste no es comoda para el usuario`, margin, y);
+        }
       }
 
       // Verificar si headingSizes existe y es un array antes de intentar iterar sobre él
@@ -116,7 +198,11 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
 
         parsedCriteria.headingSizes.forEach((headingSize, index) => {
           y += lineHeight;
-          doc.text(`Encabezado ${index + 1}: ${headingSize}`, margin, y);
+          if (headingSize >= 26){
+            doc.text(`El tamaño del Encabezado ${index + 1} es de al menos 26pt: ${headingSize}\nEl usuario puede leer comodamente este encabezado`, margin, y);
+          } else{
+            doc.text(`El tamaño del Encabezado ${index + 1} es de menor a 26pt: ${headingSize}\nEl usuario no puede leer comodamente este encabezado`, margin, y);
+          }
         });
       } else {
         y += lineHeight;
@@ -130,7 +216,12 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
 
         parsedCriteria.buttonSizes.forEach((buttonSize, index) => {
           y += lineHeight;
-          doc.text(`Botón ${index + 1}: ${buttonSize.width}x${buttonSize.height} píxeles`, margin, y);
+          if (buttonSize.width >= 44 && buttonSize.height >= 44){
+            doc.text(`El tamaño del Botón ${index + 1} es de dimension mayor o igual a 44x44: ${buttonSize.width}x${buttonSize.height} píxeles\nEl usuario puede reconocer comodamente este botón`, margin, y);
+
+          } else{
+            doc.text(`El tamaño del Botón ${index + 1} es de dimension menor a 44x44: ${buttonSize.width}x${buttonSize.height} píxeles\nEl usuario puede no reconocer comodamente este botón`, margin, y);
+          }
         });
       } else {
         y += lineHeight;
