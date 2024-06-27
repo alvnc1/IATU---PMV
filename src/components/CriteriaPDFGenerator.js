@@ -42,7 +42,7 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
     doc.setFontSize(12);
 
     y += lineHeight;
-    doc.text(`Nombre de la tarea: ${task.selectedOption}`, margin, y);
+    doc.text(`Nombre de la tarea: ${task.nombreTarea}`, margin, y);
 
     y += lineHeight;
     const inputDescriptionLines = doc.splitTextToSize(`Descripción de la tarea: ${task.inputValue}`, maxLineWidth);
@@ -60,6 +60,8 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
 
     const criteriaText = JSON.stringify(criteriaData, null, 2);
     const criteriaLines = doc.splitTextToSize(criteriaText, maxLineWidth);
+
+    console.log(criteriaLines);
 
     criteriaLines.forEach(line => {
       if (y + lineHeight > pageHeight - margin) {

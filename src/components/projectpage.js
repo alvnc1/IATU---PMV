@@ -144,7 +144,7 @@ function ProjectPage() {
               <Button variant="light" className="neutral-btn mb-2">
                 <TestRunner task={selectedTask} onTestRun={() => handleTestRun(selectedTask.id)} />
               </Button>
-              <Button variant="light" className="neutral-btn mb-2" disabled={!testStatus[selectedTask.id]}>
+              <Button variant="light" className="feed-btn mb-2" disabled={!testStatus[selectedTask.id]}>
                 <CriteriaPDFGenerator task={selectedTask} />
               </Button>
               <Button variant="danger" className="danger-btn" onClick={() => deleteTask(selectedTask.id)}>
