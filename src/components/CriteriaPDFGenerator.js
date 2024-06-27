@@ -42,7 +42,7 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
     doc.setFontSize(12);
 
     y += lineHeight;
-    doc.text(`Nombre de la tarea: ${task.nombreTarea}`, margin, y);
+    doc.text(`Nombre de la tarea: ${task.selectedOption}`, margin, y);
 
     y += lineHeight;
     const inputDescriptionLines = doc.splitTextToSize(`Descripción de la tarea: ${task.inputValue}`, maxLineWidth);
