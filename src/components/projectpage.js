@@ -141,9 +141,15 @@ function ProjectPage() {
             <p><strong>Usuario:</strong> {getUserInfo(selectedTask.selectedOption)}</p>
             <p><strong>Descripción:</strong> {selectedTask.inputValue}</p>
             <div className="d-flex flex-column align-items-stretch">
-              <Button variant="light" className="neutral-btn mb-2"><TestRunner task={selectedTask} /></Button>
-              <Button variant="light" className="neutral-btn mb-2" disabled={!testStatus[selectedTask.id]}><CriteriaPDFGenerator task={selectedTask} /></Button>
-              <Button variant="danger" className="danger-btn" onClick={() => deleteTask(selectedTask.id)}> <MdDelete /> Eliminar Tarea</Button>
+              <Button variant="light" className="neutral-btn mb-2">
+                <TestRunner task={selectedTask} onTestRun={() => handleTestRun(selectedTask.id)} />
+              </Button>
+              <Button variant="light" className="neutral-btn mb-2" disabled={!testStatus[selectedTask.id]}>
+                <CriteriaPDFGenerator task={selectedTask} />
+              </Button>
+              <Button variant="danger" className="danger-btn" onClick={() => deleteTask(selectedTask.id)}>
+                <MdDelete /> Eliminar Tarea
+              </Button>
             </div>
           </Modal.Body>
         </Modal>

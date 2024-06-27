@@ -3,7 +3,7 @@ import Button from 'react-bootstrap/Button';
 import axios from 'axios';
 import jsPDF from 'jspdf';
 
-const CriteriaPDFGenerator = ({ project, disabled }) => {
+const CriteriaPDFGenerator = ({ task, disabled }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [criteria, setCriteria] = useState(null);
 
@@ -15,11 +15,11 @@ const CriteriaPDFGenerator = ({ project, disabled }) => {
       const criteriaData = response.data;
 
       setCriteria({
-        project,
+        task,
         criteria: criteriaData
       });
 
-      generatePDF(project, criteriaData);
+      generatePDF(task, criteriaData);
 
     } catch (error) {
       console.error('Error al obtener los criterios:', error);
@@ -29,24 +29,23 @@ const CriteriaPDFGenerator = ({ project, disabled }) => {
     }
   };
 
-  const generatePDF = (project, criteriaData) => {
+  const generatePDF = (task, criteriaData) => {
     const doc = new jsPDF();
     doc.text('Criterios del Proyecto', 10, 10);
     doc.setFontSize(12);
 
-    doc.text(`Nombre del Proyecto: ${project.nombreProyecto}`, 10, 20);
-    doc.text(`Descripción de la Prueba: ${project.inputValue}`, 10, 30);
-    doc.text(`Sitio Web: ${project.webLink}`, 10, 40);
+    doc.text(`Nombre del Proyecto: ${task.nombreTarea}`, 10, 20);
+    doc.text(`Descripción de la Prueba: ${task.inputValue}`, 10, 30);
 
-    doc.text('Criterios:', 10, 50);
-    doc.text(JSON.stringify(criteriaData, null, 2), 10, 60);
+    doc.text('Criterios:', 10, 40);
+    doc.text(JSON.stringify(criteriaData, null, 2), 10, 50);
 
     doc.save('criterios.pdf');
   };
 
   return (
     <div>
-      <Button onClick={handleGeneratePDF} disabled={disabled || isLoading}>
+      <Button variant="primary" onClick={handleGeneratePDF} disabled={disabled || isLoading}>
         {isLoading ? 'Generando PDF...' : 'Generar Feedback'}
       </Button>
       {criteria && (
