@@ -50,7 +50,6 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
     let y = 20;
     doc.text('Criterios de la Tarea', (pageWidth - doc.getTextWidth('Criterios de la Tarea'))/2, y);
     doc.setFontSize(12);
-    doc.setFont('normal');
     y += lineHeight;
     doc.text(`Nombre de la tarea: ${task.nombreTarea}`, margin, y);
 
@@ -130,6 +129,9 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
       }
 
       // Verificar si buttonSizes existe y es un array antes de intentar iterar sobre él
+      alert(parsedCriteria.buttonSizes); //parsedCriteria.buttonSizes es un string que dice "Al menos un boton no cumple el criterio"
+      alert(parsedCriteria.buttonSizes.length);
+
       if (Array.isArray(parsedCriteria.buttonSizes) && parsedCriteria.buttonSizes.length > 0) {
         y += lineHeight;
         doc.text('Tamaños de botones:', margin, y);
