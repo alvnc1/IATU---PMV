@@ -48,10 +48,9 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
     const maxLineWidth = pageWidth - 2 * margin;
     const lineHeight = 10;
     let y = 20;
-
-    doc.text('Criterios de la Tarea', margin, y);
+    doc.text('Criterios de la Tarea', (pageWidth - doc.getTextWidth('Criterios de la Tarea'))/2, y);
     doc.setFontSize(12);
-
+    doc.setFont('normal');
     y += lineHeight;
     doc.text(`Nombre de la tarea: ${task.nombreTarea}`, margin, y);
 
