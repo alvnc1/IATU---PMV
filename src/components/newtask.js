@@ -1,12 +1,13 @@
 import React, { useState } from "react";
-import NavBar from "./navBar";
+import NavBar from "./navBar"; // Asumiendo que tu componente NavBar está correctamente importado y ubicado en './NavBar'
 import "../login-register.css";
 import { useNavigate } from 'react-router-dom';
 import Container from "react-bootstrap/Container";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
-import { db } from "./firebase";
+import { db, storage } from "./firebase"; // Asegúrate de importar 'storage' desde './firebase'
 import { doc, setDoc, collection } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage"; // Importa funciones necesarias de Firebase Storage
 import { useParams } from 'react-router-dom';
 
 function NewTask() {
@@ -19,6 +20,7 @@ function NewTask() {
     const [tipoInput, setTipoInput] = useState('enlace');
     const [webLink, setWebLink] = useState('');
     const [imagenFile, setImagenFile] = useState(null);
+    const [imageUrl, setImageUrl] = useState(''); // Estado para almacenar la URL de la imagen subida
 
     const handleSelectChange = (e) => {
         setSelectedOption(e.target.value);
@@ -69,12 +71,22 @@ function NewTask() {
                 return;
             }
 
+            let imageUrl = ''; // Inicializa la URL de la imagen
+
+            // Si hay una imagen seleccionada, subirla a Firebase Storage y obtener la URL
+            if (imagenFile) {
+                const storageRef = ref(storage, `images/${Date.now()}`);
+                await uploadBytes(storageRef, imagenFile);
+                imageUrl = await getDownloadURL(storageRef);
+            }
+
             // Objeto con los datos a guardar
             const tarea = {
                 nombreTarea,
                 selectedOption,
                 inputValue,
-                webLink
+                webLink,
+                imageUrl // Incluir la URL de la imagen en el objeto tarea
             };
 
             // Guardar documento en Firestore dentro de la colección tasks del proyecto específico
@@ -85,6 +97,7 @@ function NewTask() {
             setSelectedOption('');
             setInputValue('');
             setNombreTarea('');
+            setImagenFile(null); // Limpiar el estado de la imagen también
 
             // Mostrar los datos en la consola
             console.log("Tarea guardada en Firebase:", tarea);

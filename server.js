@@ -5,10 +5,46 @@ const cors = require("cors"); // Importa el middleware CORS
 
 const app = express();
 const port = 3001;
-
 // Configura CORS para permitir solicitudes desde http://localhost:3000
 app.use(cors());
 app.use(express.json());
+
+app.post("/generate-feedback", async (req, res) => {
+  const { imageUrl } = req.body;
+  console.log(imageUrl)
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `Analiza la imagen y genera feedback sobre los siguientes criterios piensa que la página la podrían usar adultos mayores:
+              - Tamaño de letra.
+              - Espaciado entre líneas de texto.
+              - Tamaño de letra.
+              - Tamaño de botones de al menos 44x44 píxeles.` },
+            {
+              type: "image_url",
+              image_url: {
+                "url": `${imageUrl}`,
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+
+    console.log(response.choices[0]);
+    const feedback = response.choices[0].message.content;
+    res.status(200).json({ success: true, feedback });
+  } catch (error) {
+    console.error("Error al generar feedback:", error);
+    res.status(500).json({ success: false, error: "Error al generar feedback" });
+  }
+});
+
 
 const MAX_ATTEMPTS = 10;
 const EXECUTION_TIMEOUT = 5000; // Tiempo límite de ejecución en milisegundos (5 segundos)
