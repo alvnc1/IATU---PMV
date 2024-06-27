@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Button from 'react-bootstrap/Button';
 import axios from 'axios';
 import jsPDF from 'jspdf';
+import myImage from "./images/logo.png"
 
 const CriteriaPDFGenerator = ({ task, disabled }) => {
   const [isLoading, setIsLoading] = useState(false);
@@ -118,10 +119,10 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
 
         parsedCriteria.headingSizes.forEach((headingSize, index) => {
           y += lineHeight;
-          if (headingSize >= 24){
+          if (parseInt(headingSize) >= 24){
             doc.text(`El tamaño del Encabezado ${index + 1} es de al menos 24pt: ${headingSize}\nEl usuario puede leer comodamente este encabezado`, margin, y);
           } else{
-            doc.text(`El tamaño del Encabezado ${index + 1} es de menor a 24pt: ${headingSize}\nEl usuario no puede leer comodamente este encabezado`, margin, y);
+            doc.text(`El tamaño del Encabezado ${index + 1} es menor a 24pt: ${headingSize}\nEl usuario no puede leer comodamente este encabezado`, margin, y);
           }
         });
       } else {
@@ -198,7 +199,7 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
 
         parsedCriteria.headingSizes.forEach((headingSize, index) => {
           y += lineHeight;
-          if (headingSize >= 26){
+          if (parseInt(headingSize) >= 26){
             doc.text(`El tamaño del Encabezado ${index + 1} es de al menos 26pt: ${headingSize}\nEl usuario puede leer comodamente este encabezado`, margin, y);
           } else{
             doc.text(`El tamaño del Encabezado ${index + 1} es de menor a 26pt: ${headingSize}\nEl usuario no puede leer comodamente este encabezado`, margin, y);
@@ -216,7 +217,7 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
 
         parsedCriteria.buttonSizes.forEach((buttonSize, index) => {
           y += lineHeight;
-          if (buttonSize.width >= 44 && buttonSize.height >= 44){
+          if (parseInt(buttonSize.width) >= 44 && parseInt(buttonSize.height) >= 44){
             doc.text(`El tamaño del Botón ${index + 1} es de dimension mayor o igual a 44x44: ${buttonSize.width}x${buttonSize.height} píxeles\nEl usuario puede reconocer comodamente este botón`, margin, y);
 
           } else{
@@ -228,8 +229,17 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
         doc.text('No se encontraron tamaños de botones válidos', margin, y);
       }
     }
+    const img = new Image();
+    img.src = myImage;
+    img.onload = () => {
+      const imgWidth = 50;
+      const imgHeight = (img.height * imgWidth) / img.width; // Mantener la proporción de la imagen
 
-    doc.save('Reporte.pdf');
+      // Agregar imagen al PDF
+      doc.addImage(img, 'PNG', pageWidth - imgWidth - margin, margin, imgWidth, imgHeight); // (imagen, tipo, X, Y, ancho, alto)
+
+      doc.save('Reporte.pdf');
+      };
   };
 
   return (
