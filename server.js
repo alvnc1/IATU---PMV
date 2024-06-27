@@ -104,7 +104,7 @@ app.post("/run-test", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `para Puppeteer crea el código completo con {headless: false} (solo el código) para: ${project.inputValue}, en la web: ${project.webLink} y después de realizar las acciones requeridas, toma una captura de pantalla con el nombre ${project.id}. No ocupes la funcion page.waitForTimeout de puppeteer ni tampoco uses delimitadores. Luego del goto agrega esto: await page.setViewport({width: 1920,height: 1080 ,deviceScaleFactor: 1,}); y `,
+            content: `para Puppeteer crea el código completo con {headless: false} (solo el código) para: ${project.inputValue}, en la web: ${project.webLink} y después de realizar las acciones requeridas, toma una captura de pantalla con el nombre ${project.id}. No ocupes la funcion page.waitForTimeout de puppeteer ni tampoco uses delimitadores. Abre en pantalla completa con: await page.setViewport({width: 1920,height: 1080 ,deviceScaleFactor: 1,}); y no uses la función waitForNavigation() de Puppeteer`,
           },
         ],
         model: "gpt-3.5-turbo",
