@@ -31,14 +31,44 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
 
   const generatePDF = (task, criteriaData) => {
     const doc = new jsPDF();
-    doc.text('Criterios del Proyecto', 10, 10);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 10;
+    const maxLineWidth = pageWidth - 2 * margin;
+    const lineHeight = 10;
+    let y = 20;
+
+    doc.text('Criterios de la Tarea', margin, y);
     doc.setFontSize(12);
 
-    doc.text(`Nombre del Proyecto: ${task.nombreTarea}`, 10, 20);
-    doc.text(`Descripción de la Prueba: ${task.inputValue}`, 10, 30);
+    y += lineHeight;
+    doc.text(`Nombre de la tarea: ${task.nombreTarea}`, margin, y);
 
-    doc.text('Criterios:', 10, 40);
-    doc.text(JSON.stringify(criteriaData, null, 2), 10, 50);
+    y += lineHeight;
+    const inputDescriptionLines = doc.splitTextToSize(`Descripción de la tarea: ${task.inputValue}`, maxLineWidth);
+    inputDescriptionLines.forEach(line => {
+      if (y + lineHeight > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      y += lineHeight;
+      doc.text(line, margin, y);
+    });
+
+    y += lineHeight;
+    doc.text('Criterios:', margin, y);
+
+    const criteriaText = JSON.stringify(criteriaData, null, 2);
+    const criteriaLines = doc.splitTextToSize(criteriaText, maxLineWidth);
+
+    criteriaLines.forEach(line => {
+      if (y + lineHeight > pageHeight - margin) {
+        doc.addPage();
+        y = margin;
+      }
+      y += lineHeight;
+      doc.text(line, margin, y);
+    });
 
     doc.save('criterios.pdf');
   };
