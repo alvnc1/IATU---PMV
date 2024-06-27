@@ -11,6 +11,7 @@ app.use(cors());
 app.use(express.json());
 
 const MAX_ATTEMPTS = 10;
+const EXECUTION_TIMEOUT = 5000; // Tiempo límite de ejecución en milisegundos (5 segundos)
 
 // Variable global para almacenar los criterios obtenidos
 let storedCriteria = null;
@@ -39,7 +40,7 @@ async function checkDesignCriteria(webLink) {
     });
 
     // Obtener tamaños de letra para títulos (h1 a h6)
-    const headings = document.querySelectorAll("h1, h2, h3, h4, h5, h6");
+    const headings = document.querySelectorAll("h1");
     const headingSizes = [];
     headings.forEach((heading) => {
       const headingStyles = window.getComputedStyle(heading);
@@ -88,6 +89,17 @@ async function checkDesignCriteria(webLink) {
   return result;
 }
 
+// Función para ejecutar el código generado por OpenAI con un límite de tiempo
+async function executeWithTimeout(code, timeout) {
+  return Promise.race([
+    (async () => {
+      await eval(code);
+    })(),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Execution timed out")), timeout)
+    ),
+  ]);
+}
 
 // Ruta para ejecutar la prueba con OpenAI y verificar criterios de diseño
 app.post("/run-test", async (req, res) => {
@@ -104,7 +116,7 @@ app.post("/run-test", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `para Puppeteer crea el código completo con {headless: false} (solo el código) para: ${project.inputValue}, en la web: ${project.webLink} y después de realizar las acciones requeridas, usa try para tomar una captura de pantalla con el nombre ${project.id} en caso de no poder usa pass. No ocupes la funcion page.waitForTimeout de Puppeteer ni tampoco uses el delimitador backticks. Abre en pantalla completa con: await page.setViewport({width: 1920,height: 1080 ,deviceScaleFactor: 1,}); y no uses la función waitForNavigation() de Puppeteer`,
+            content: `para Puppeteer crea el código completo con {headless: false} (solo el código) para: ${project.inputValue}, en la web: ${project.webLink} y después de realizar las acciones requeridas, usa try para tomar una captura de pantalla con el nombre ${project.id} en caso de no poder tomar una captura de pantalla, sigue avanzando con la ejecucion. No ocupes la funcion page.waitForTimeout de Puppeteer ni tampoco uses el delimitador backticks. Abre en pantalla completa con: await page.setViewport({width: 1920,height: 1080 ,deviceScaleFactor: 1,}); y no uses la función waitForNavigation() de Puppeteer`,
           },
         ],
         model: "gpt-3.5-turbo",
@@ -128,8 +140,8 @@ app.post("/run-test", async (req, res) => {
       const generatedCode = response.choices[0].message.content;
       console.log("Respuesta de OpenAI:", generatedCode);
 
-      // Ejecutar el código generado por OpenAI
-      await eval(generatedCode);
+      // Ejecutar el código generado por OpenAI con timeout
+      await executeWithTimeout(generatedCode, EXECUTION_TIMEOUT);
 
       // Verificar criterios de diseño después de ejecutar el código
       criteriaResult = await checkDesignCriteria(urlResponse);

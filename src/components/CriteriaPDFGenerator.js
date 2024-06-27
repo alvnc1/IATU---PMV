@@ -55,13 +55,29 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
       doc.text(line, margin, y);
     });
 
+    // Agregar el usuario seleccionado si está definido
+    if (task.selectedOption) {
+      y += lineHeight;
+      doc.text(`El usuario seleccionado es: ${task.selectedOption}`, margin, y);
+    }
+
     y += lineHeight;
     doc.text('Criterios:', margin, y);
 
+    // Parsear el objeto criteriaData si no está en formato JSON
+    const parsedCriteria = typeof criteriaData === 'string' ? JSON.parse(criteriaData) : criteriaData;
+
+    // Obtener el valor de fontSize y convertirlo a número
+    const fontSize = parseFloat(parsedCriteria.fontSize);
+
+    // Ejemplo de condición para comparar fontSize con 14px
+    if (!isNaN(fontSize) && fontSize > 14) {
+      y += lineHeight;
+      doc.text(`El tamaño de letra es mayor a 14px: ${parsedCriteria.fontSize}`, margin, y);
+    }
+
     const criteriaText = JSON.stringify(criteriaData, null, 2);
     const criteriaLines = doc.splitTextToSize(criteriaText, maxLineWidth);
-
-    console.log(criteriaLines);
 
     criteriaLines.forEach(line => {
       if (y + lineHeight > pageHeight - margin) {
@@ -82,6 +98,7 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
       </Button>
       {criteria && (
         <div>
+          {/* Aquí puedes agregar cualquier otra interfaz de usuario o mensaje que desees mostrar después de generar el PDF */}
         </div>
       )}
     </div>
