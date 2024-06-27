@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from 'react-bootstrap';
 import { IoMdPlayCircle } from 'react-icons/io';
 
-const TestRunner = ({ task, onTestRun }) => {
+const TestRunner = ({ task }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [responseText, setResponseText] = useState('');
@@ -29,7 +29,6 @@ const TestRunner = ({ task, onTestRun }) => {
       if (data.success) {
         console.log('Respuesta de OpenAI:', data.generatedCode);
         setResponseText(data.generatedCode);
-        onTestRun(); // Llamar a la función de callback cuando la prueba se ejecuta correctamente
       } else {
         setError('Hubo un error al ejecutar la prueba');
       }
