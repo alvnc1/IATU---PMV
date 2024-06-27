@@ -19,7 +19,7 @@ app.post("/generate-feedback", async (req, res) => {
         {
           role: "user",
           content: [
-            { type: "text", text: `Analiza la imagen y genera feedback sobre los siguientes criterios piensa que la página la podrían usar adultos mayores:
+            { type: "text", text: `Analiza la imagen y genera feedback sobre los siguientes criterios:
               - Tamaño de letra.
               - Espaciado entre líneas de texto.
               - Tamaño de letra.

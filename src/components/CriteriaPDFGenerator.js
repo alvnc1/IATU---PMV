@@ -129,8 +129,8 @@ const CriteriaPDFGenerator = ({ task, disabled }) => {
       }
 
       // Verificar si buttonSizes existe y es un array antes de intentar iterar sobre él
-      alert(parsedCriteria.buttonSizes); //parsedCriteria.buttonSizes es un string que dice "Al menos un boton no cumple el criterio"
-      alert(parsedCriteria.buttonSizes.length);
+      //alert(parsedCriteria.buttonSizes); //parsedCriteria.buttonSizes es un string que dice "Al menos un boton no cumple el criterio"
+      //alert(parsedCriteria.buttonSizes.length);
 
       if (Array.isArray(parsedCriteria.buttonSizes) && parsedCriteria.buttonSizes.length > 0) {
         y += lineHeight;
