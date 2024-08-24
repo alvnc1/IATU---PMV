@@ -47,7 +47,7 @@ app.post("/generate-feedback", async (req, res) => {
 
 
 const MAX_ATTEMPTS = 10;
-const EXECUTION_TIMEOUT = 5000; // Tiempo límite de ejecución en milisegundos (5 segundos)
+const EXECUTION_TIMEOUT = 10000; // Tiempo límite de ejecución en milisegundos (5 segundos)
 
 // Variable global para almacenar los criterios obtenidos
 let storedCriteria = null;
