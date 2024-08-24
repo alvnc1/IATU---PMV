@@ -46,7 +46,13 @@ function NavBar() {
       <>
     <Navbar collapseOnSelect expand="lg" className="bg-body-tertiary">
       <Container>
-        <Navbar.Brand href="/projects">IATU</Navbar.Brand>
+        <Navbar.Brand href="/projects">
+          <img
+            src={require('./images/logo-removebg.png')}
+            alt="IATU Logo"
+            style={{ height: '40px', width: 'auto' }} // Ajusta el tamaño de la imagen según sea necesario
+          />
+        </Navbar.Brand>
         <Navbar.Toggle aria-controls="responsive-navbar-nav" />
         <Navbar.Collapse id="responsive-navbar-nav">
           <Nav className="me-auto">
@@ -63,7 +69,13 @@ function NavBar() {
     ) : (
         <Navbar collapseOnSelect expand="lg" className="bg-body-tertiary">
         <Container>
-          <Navbar.Brand href="/projects">IATU</Navbar.Brand>
+          <Navbar.Brand href="/projects">
+            <img
+              src={require('./images/logo.png')}
+              alt="IATU Logo"
+              style={{ height: '40px', width: 'auto' }} // Ajusta el tamaño de la imagen según sea necesario
+            />
+          </Navbar.Brand>
           <Navbar.Toggle aria-controls="responsive-navbar-nav" />
           <Navbar.Collapse id="responsive-navbar-nav">
             <Nav className="me-auto">

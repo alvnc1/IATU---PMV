@@ -122,11 +122,7 @@ function ProjectPage() {
             {tasks.map((task) => (
               <Col key={task.id} xs={12} sm={6} md={4} lg={3} className="mb-4">
                 <Card className="project-card">
-                  {task.imageUrl ? (
-                    <Card.Img variant="top" src={task.imageUrl} alt="Task Image" />
-                  ) : (
-                    <Card.Img variant="top" src={require("./images/logo.png")} alt="Default Image" />
-                  )}
+                <Card.Img variant="top" src={require("./images/bk.png")} alt="Project Image" />
                   <Card.Body className="text-center">
                     <Card.Title>{task.nombreTarea}</Card.Title>
                     <Button variant="primary" onClick={() => handleShowModal(task)}>Ver Tarea</Button>

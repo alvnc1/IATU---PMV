@@ -111,14 +111,16 @@ function MyProjects() {
             {projects.map((project) => (
               <Col key={project.id} xs={12} sm={6} md={4} lg={3} className="mb-4">
                 <Card className="project-card">
-                  <Card.Img variant="top" src={require("./images/logo.png")} alt="Project Image" />
+                  <Card.Img variant="top" src={require("./images/bk.png")} alt="Project Image" />
                   <Card.Body className="text-center">
-                    <Card.Title>{project.nombreProyecto}</Card.Title>
-                    <Card.Title>{project.descripcionProyecto}</Card.Title>
-                    <Button variant="primary" className="mb-2" onClick={() => navigate(`/project/${project.id}`)}>Ver Proyecto</Button>
+                    <Card.Title className="card-headline">{project.nombreProyecto}</Card.Title>
+                    <Card.Subtitle className="mb-2 text-muted card-subhead">{project.descripcionProyecto}</Card.Subtitle>
+                    <div className="d-flex justify-content-center">
+                    <Button variant="primary" className="mb-2 feed-btn" onClick={() => navigate(`/project/${project.id}`)}>Ver Proyecto</Button>
                     <Button variant="danger" className="danger-btn mb-2" onClick={() => deleteProject(project.id)}>
                       <MdDelete size={24} />
                     </Button>
+                    </div>
                   </Card.Body>
                 </Card>
               </Col>

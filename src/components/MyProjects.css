@@ -1,21 +1,26 @@
-.neutral-btn {
-  background-color: #17884a;
-  border: none;
-  color: #333;
-  width: 100%;
-  text-align: center;
+.project-card .card-headline {
+  font-size: 24px; /* Headline */
+  margin-bottom: 0.5rem;
 }
 
-.neutral-btn:hover {
-  background-color: #17884a;
-  color: #111;
+.project-card .card-subhead {
+  font-size: 16px; /* Subheadline */
 }
+
+.project-card .card-body p {
+  font-size: 14px; /* Body */
+}
+
+.project-card .card-body .d-flex {
+  gap: 60px; /* Espacio entre los botones */
+}
+
 .feed-btn {
+  font-size: 16px; /* Button Label */
   background-color: #007bff;
   border: none;
   color: #ffffff;
-  width: 100%;
-  text-align: center;
+  border-radius: 30px; /* Más redondeado */
 }
 
 .feed-btn:hover {
@@ -24,14 +29,28 @@
 }
 
 .danger-btn {
+  font-size: 16px; /* Button Label */
   background-color: #dc3545; /* Color rojo de Bootstrap */
   color: white;
   border: none;
-  width: 100%;
-  text-align: center;
+  border-radius: 30px; /* Más redondeado */
 }
 
 .danger-btn:hover {
   background-color: #c82333;
   color: white;
+}
+
+.neutral-btn {
+  background-color: #17884a;
+  border: none;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  border-radius: 30px; /* Más redondeado */
+}
+
+.neutral-btn:hover {
+  background-color: #17884a;
+  color: #111;
 }
