@@ -134,41 +134,6 @@ function NewProject() {
                 </Form.Group>
                 
                 <Form onSubmit={handleSubmit}>
-                    <div className="d-flex justify-content-between align-items-center">
-                        <h5 style={{ textAlign: "left", marginTop: '20px' }}>Recurso/s a Testear</h5>
-                    </div>
-
-                    <Form.Group controlId="formBasicTipoInput">
-                        <Form.Label>Tipo de recurso</Form.Label>
-                        <Form.Control as="select" value={tipoInput} onChange={handleTipoInputChange}>
-                            <option value="enlace">Enlace Web</option>
-                            <option value="imagen">Imagen</option>
-                        </Form.Control>
-                    </Form.Group>
-
-                    {tipoInput === 'enlace' && (
-                        <Form.Group style={{ marginTop: '10px' }} controlId="formBasicWebLink">
-                            <Form.Control
-                                type="text"
-                                placeholder="Escribe el enlace de tu web..."
-                                value={webLink}
-                                onChange={handleWebLinkChange}
-                            />
-                        </Form.Group>
-                    )}
-
-                    {tipoInput === 'imagen' && (
-                        <Form.Group controlId="formBasicImageUpload" style={{ marginTop: '10px' }}>
-                            <Form.Control
-                                type="file"
-                                id="custom-file"
-                                label="Selecciona un archivo"
-                                custom
-                                onChange={handleFileChange}
-                            />
-                        </Form.Group>
-                    )}
-
                     <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
                         <Button variant="primary" type="submit">
                             Guardar Proyecto

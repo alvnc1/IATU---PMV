@@ -1,42 +1,27 @@
 import React, { useState } from "react";
-import NavBar from "./navBar"; // Asumiendo que tu componente NavBar está correctamente importado y ubicado en './NavBar'
+import NavBar from "./navBar"; 
 import "../login-register.css";
 import { useNavigate } from 'react-router-dom';
 import Container from "react-bootstrap/Container";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
-import { db, storage } from "./firebase"; // Asegúrate de importar 'storage' desde './firebase'
+import { db, storage } from "./firebase"; 
 import { doc, setDoc, collection } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage"; // Importa funciones necesarias de Firebase Storage
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage"; 
 import { useParams } from 'react-router-dom';
 
 function NewTask() {
-    const { id: projectId } = useParams(); // Obtener el ID del proyecto desde la URL
+    const { id: projectId } = useParams(); 
     const [selectedOption, setSelectedOption] = useState('');
     const [inputValue, setInputValue] = useState('');
     const [nombreTarea, setNombreTarea] = useState('');
     const [errors, setErrors] = useState({});
-    const navigate = useNavigate(); // Crear instancia de useNavigate
-    const [tipoInput, setTipoInput] = useState('enlace');
-    const [webLink, setWebLink] = useState('');
-    const [imagenFile, setImagenFile] = useState(null);
-    const [imageUrl, setImageUrl] = useState(''); // Estado para almacenar la URL de la imagen subida
+    const navigate = useNavigate(); 
+    const [files, setFiles] = useState([]);
+    const [uploadStatus, setUploadStatus] = useState({});
 
     const handleSelectChange = (e) => {
         setSelectedOption(e.target.value);
-    };
-
-    const handleWebLinkChange = (e) => {
-        setWebLink(e.target.value);
-    };
-
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        setImagenFile(file);
-    };
-
-    const handleTipoInputChange = (e) => {
-        setTipoInput(e.target.value);
     };
 
     const handleInputChange = (e) => {
@@ -50,11 +35,38 @@ function NewTask() {
     const validate = () => {
         const errors = {};
         if (!nombreTarea) errors.nombreTarea = "El nombre de la tarea es obligatorio.";
-        if (!selectedOption) errors.selectedOption = "Debe seleccionar un usuario.";
-        if (!inputValue) errors.inputValue = "Debe definir la prueba a realizar.";
-
         setErrors(errors);
         return Object.keys(errors).length === 0;
+    };
+
+    const handleFileUpload = async (file) => {
+        const fileId = Date.now().toString();
+        setUploadStatus(prevStatus => ({
+            ...prevStatus,
+            [fileId]: 'uploading'
+        }));
+
+        try {
+            const storageRef = ref(storage, `uploads/${fileId}_${file.name}`);
+            await uploadBytes(storageRef, file);
+            const downloadUrl = await getDownloadURL(storageRef);
+
+            setFiles(prevFiles => [...prevFiles, { id: fileId, name: file.name, url: downloadUrl }]);
+            setUploadStatus(prevStatus => ({
+                ...prevStatus,
+                [fileId]: 'success'
+            }));
+        } catch (error) {
+            setUploadStatus(prevStatus => ({
+                ...prevStatus,
+                [fileId]: 'error'
+            }));
+        }
+    };
+
+    const handleFilesChange = (e) => {
+        const filesArray = Array.from(e.target.files);
+        filesArray.forEach(file => handleFileUpload(file));
     };
 
     const handleSubmit = async (e) => {
@@ -65,42 +77,25 @@ function NewTask() {
         }
 
         try {
-            // Verifica que projectId no esté vacío
             if (!projectId) {
                 alert("Error: No se pudo obtener el ID del proyecto.");
                 return;
             }
 
-            let imageUrl = ''; // Inicializa la URL de la imagen
-
-            // Si hay una imagen seleccionada, subirla a Firebase Storage y obtener la URL
-            if (imagenFile) {
-                const storageRef = ref(storage, `images/${Date.now()}`);
-                await uploadBytes(storageRef, imagenFile);
-                imageUrl = await getDownloadURL(storageRef);
-            }
-
-            // Objeto con los datos a guardar
             const tarea = {
                 nombreTarea,
                 selectedOption,
                 inputValue,
-                webLink,
-                imageUrl // Incluir la URL de la imagen en el objeto tarea
+                files 
             };
 
-            // Guardar documento en Firestore dentro de la colección tasks del proyecto específico
             const projectRef = doc(db, "proyectos", projectId);
             await setDoc(doc(collection(projectRef, "tasks"), Date.now().toString()), tarea);
 
-            // Limpiar los campos después de guardar
             setSelectedOption('');
             setInputValue('');
             setNombreTarea('');
-            setImagenFile(null); // Limpiar el estado de la imagen también
-
-            // Mostrar los datos en la consola
-            console.log("Tarea guardada en Firebase:", tarea);
+            setFiles([]);
 
             alert("Tarea guardada correctamente!");
             navigate(`/project/${projectId}`)
@@ -120,11 +115,11 @@ function NewTask() {
                     backgroundColor: "white",
                     borderRadius: "10px",
                     padding: "20px",
-                    width: "90%", // Ancho del contenedor interno
-                    maxWidth: "1200px", // Ancho máximo del contenedor interno
-                    height: "80vh", // Altura del contenedor interno
-                    overflowY: "auto", // Scroll vertical si es necesario
-                    boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)", // Sombra ligera
+                    width: "90%", 
+                    maxWidth: "1200px", 
+                    height: "80vh", 
+                    overflowY: "auto", 
+                    boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)", 
                 }}
             >
                 <div className="d-flex justify-content-between align-items-center">
@@ -154,78 +149,48 @@ function NewTask() {
                     </Form.Control.Feedback>
                 </Form.Group>
 
-                <Form onSubmit={handleSubmit}>
-                    <div className="d-flex justify-content-between align-items-center">
-                        <h5 style={{ textAlign: "left", marginTop: '20px' }}>Recurso/s a Testear</h5>
-                    </div>
-
-                    <Form.Group controlId="formBasicTipoInput">
-                        <Form.Label>Tipo de recurso</Form.Label>
-                        <Form.Control as="select" value={tipoInput} onChange={handleTipoInputChange}>
-                            <option value="enlace">Enlace Web</option>
-                            <option value="imagen">Imagen</option>
-                        </Form.Control>
-                    </Form.Group>
-
-                    {tipoInput === 'enlace' && (
-                        <Form.Group style={{ marginTop: '10px' }} controlId="formBasicWebLink">
-                            <Form.Control
-                                type="text"
-                                placeholder="Escribe el enlace de tu web..."
-                                value={webLink}
-                                onChange={handleWebLinkChange}
-                            />
-                        </Form.Group>
-                    )}
-
-                    {tipoInput === 'imagen' && (
-                        <Form.Group controlId="formBasicImageUpload" style={{ marginTop: '10px' }}>
-                            <Form.Control
-                                type="file"
-                                id="custom-file"
-                                label="Selecciona un archivo"
-                                custom
-                                onChange={handleFileChange}
-                            />
-                        </Form.Group>
-                    )}
-                </Form>
-
-                <div className="d-flex justify-content-between align-items-center">
-                    <h5 style={{ textAlign: "left", marginTop: '20px' }}>Seleccione el usuario</h5>
+                <div className="d-flex justify-content-between align-items-center" style={{ marginTop: '20px' }}>
+                    <h5 style={{ textAlign: "left", marginTop: '20px' }}>Subir Archivos</h5>
                 </div>
-                <Form.Group controlId="formBasicDropdown">
-                    <Form.Control 
-                        as="select" 
-                        value={selectedOption} 
-                        onChange={handleSelectChange} 
-                        isInvalid={!!errors.selectedOption}
-                    >
-                        <option value="">Seleccione...</option>
-                        <option value="opcion1">Javier Sánchez, 32 años: Apasionado por la tecnología.</option>
-                        <option value="opcion2">José Gómez, 68 años: Entusiasta del arte contemporáneo.</option>
-                    </Form.Control>
-                    <Form.Control.Feedback type="invalid">
-                        {errors.selectedOption}
-                    </Form.Control.Feedback>
-                </Form.Group>
-
-                <div className="d-flex justify-content-between align-items-center">
-                    <h5 style={{ textAlign: "left", marginTop: '20px', marginBottom:'-10px' }}>Defina la prueba a realizar en lenguaje natural</h5>
-                </div>
-                <Form.Group controlId="formBasicText">
-                    <Form.Label></Form.Label>
-                    <Form.Control
-                        type="text"
-                        placeholder="Escriba en lenguaje natural la prueba a realizar..."
-                        value={inputValue}
-                        onChange={handleInputChange}
-                        isInvalid={!!errors.inputValue}
+                <div
+                    style={{
+                        border: '2px dashed #ccc',
+                        borderRadius: '10px',
+                        padding: '20px',
+                        textAlign: 'center',
+                        marginBottom: '20px'
+                    }}
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        handleFilesChange(e);
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                >
+                    <input
+                        type="file"
+                        multiple
+                        onChange={handleFilesChange}
+                        style={{ display: 'none' }}
+                        id="fileUpload"
                     />
-                    <Form.Control.Feedback type="invalid">
-                        {errors.inputValue}
-                    </Form.Control.Feedback>
-                </Form.Group>
+                    <label htmlFor="fileUpload" style={{ cursor: 'pointer' }}>
+                        Drag&Drop your files here or <span style={{ color: '#007bff', textDecoration: 'underline' }}>browse</span> to upload.
+                    </label>
+                </div>
+
+                <div>
+                    <h5>Archivos Subidos</h5>
+                    {files.map((file) => (
+                        <div key={file.id} style={{ marginBottom: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span>{file.name}</span>
+                                {uploadStatus[file.id] === 'uploading' && <span>Cargando...</span>}
+                                {uploadStatus[file.id] === 'success' && <span style={{ color: 'green' }}>Subido</span>}
+                                {uploadStatus[file.id] === 'error' && <span style={{ color: 'red' }}>Error al subir</span>}
+                            </div>
+                        </div>
+                    ))}
+                </div>
 
                 <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
                     <Button variant="primary" onClick={handleSubmit}>
