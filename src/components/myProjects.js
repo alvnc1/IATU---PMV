@@ -7,7 +7,7 @@ import Dropdown from 'react-bootstrap/Dropdown';
 import { MdDelete, MdAccessTime, MdMoreVert, MdShare } from "react-icons/md"; 
 import { collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
 import { db } from "./firebase";
-import './MyProjects.css';
+import './css/MyProjects.css';
 import { useNavigate } from 'react-router-dom';
 
 function MyProjects() {

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { MdAddBox, MdAccountCircle, MdApps } from "react-icons/md";
 import { auth, db } from "./firebase";
 import { doc, getDoc } from "firebase/firestore";
-import './Sidebar.css'; // Archivo CSS para estilos adicionales
+import './css/Sidebar.css'; // Archivo CSS para estilos adicionales
 
 function Sidebar() {
   const [userDetails, setUserDetails] = useState(null);

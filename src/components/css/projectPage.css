@@ -1,0 +1,32 @@
+.table-fixed {
+    table-layout: fixed;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0; /* Elimina los espacios entre las celdas para aplicar bordes redondeados */
+  }
+  
+  .table-fixed th,
+  .table-fixed td {
+    border: 1px solid #dee2e6; /* Estilo de borde */
+    padding: 8px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  
+  .table-fixed th {
+    border-top-left-radius: 10px; /* Redondea las esquinas superiores */
+    border-top-right-radius: 10px;
+    background-color: #f8f9fa; /* Color de fondo del encabezado */
+    font-weight: bold;
+  }
+  
+  .table-fixed tbody tr:first-child td {
+    border-top-left-radius: 10px; /* Redondea las esquinas superiores */
+    border-top-right-radius: 10px;
+  }
+  
+  .table-fixed tbody tr:last-child td {
+    border-bottom-left-radius: 10px; /* Redondea las esquinas inferiores */
+    border-bottom-right-radius: 10px;
+  }
+  

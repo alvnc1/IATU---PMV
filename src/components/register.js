@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { auth, db } from "./firebase";
 import { setDoc, doc } from "firebase/firestore";
 import { toast } from "react-toastify";
-import '../login-register.css';
+import './css/login-register.css';
 import img from './images/logo.png';
 
 function Register() {

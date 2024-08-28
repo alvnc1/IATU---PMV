@@ -92,7 +92,7 @@ function NewProject() {
                         padding: "20px",
                         width: "95%", 
                         maxWidth: "1200px",
-                        height: "85vh",
+                        height: "auto",
                         overflowY: "auto",
                         boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)",
                     }}

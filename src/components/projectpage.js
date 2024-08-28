@@ -81,7 +81,7 @@ function ProjectPage() {
           <h2 style={{ textAlign: "left", margin: 0 }}>Proyecto {projectName}</h2>
         </div>
         <div style={{ marginTop: '20px' }}>
-          <Table striped bordered hover responsive className="table-fixed">
+          <Table striped bordered hover responsive className="rounded-table">
             <thead>
               <tr>
                 <th>File name</th>
@@ -140,6 +140,40 @@ function ProjectPage() {
           </Modal.Body>
         </Modal>
       )}
+      <style>
+        {`
+          .rounded-table {
+            border-radius: 10px;
+            overflow: hidden;
+          }
+
+          .rounded-table th:first-child, 
+          .rounded-table td:first-child {
+            border-left: none;
+          }
+
+          .rounded-table th:last-child, 
+          .rounded-table td:last-child {
+            border-right: none;
+          }
+
+          .rounded-table th:first-child {
+            border-top-left-radius: 10px;
+          }
+
+          .rounded-table th:last-child {
+            border-top-right-radius: 10px;
+          }
+
+          .rounded-table tr:last-child td:first-child {
+            border-bottom-left-radius: 10px;
+          }
+
+          .rounded-table tr:last-child td:last-child {
+            border-bottom-right-radius: 10px;
+          }
+        `}
+      </style>
     </div>
   );
 }

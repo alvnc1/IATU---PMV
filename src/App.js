@@ -11,7 +11,6 @@ import { auth } from "./components/firebase";
 import MyProjects from "./components/myProjects";
 import NewProject from "./components/newProject";
 import ProjectPage from './components/projectpage';
-import NewTask from "./components/newtask";
 import Sidebar from "./components/sidebar";
 
 
@@ -36,11 +35,10 @@ function App() {
             <Route path="/projects" element={<MyProjects />} />
             <Route path="/newproject" element={<NewProject />} />
             <Route path="/project/:id" element={<ProjectPage />} />
-            <Route path="/newtask/:id" element={<NewTask />} />
             <Route path="/sidebar" element={<Sidebar />} />
           </Routes>
           <ToastContainer />
-        </ConditionalWrapper> 
+        </ConditionalWrapper>
       </div>
     </Router>
   );
