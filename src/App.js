@@ -10,7 +10,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { auth } from "./components/firebase";
 import MyProjects from "./components/myProjects";
 import NewProject from "./components/newProject";
-import ProjectPage from './components/projectpage';
+import ProjectPage from './components/pageProject';
 import Sidebar from "./components/sidebar";
 
 

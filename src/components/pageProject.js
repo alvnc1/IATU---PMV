@@ -85,12 +85,9 @@ function ProjectPage() {
             <thead>
               <tr>
                 <th>File name</th>
-                <th>Source</th>
                 <th>Uploaded</th>
                 <th>Status</th>
-                <th>Data</th>
                 <th>Download</th>
-                <th>Location</th>
                 <th>Action</th>
               </tr>
             </thead>
@@ -98,17 +95,18 @@ function ProjectPage() {
               {tasks.map((task) => (
                 <tr key={task.id}>
                   <td className="text-truncate">{task.nombreTarea}</td>
-                  <td>{task.source || 'N/A'}</td>
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
-                  <td>Ready</td>
-                  <td>Data available</td>
+                  <td>-</td>
                   <td>
                     <Button variant="outline-primary" className="me-2">PDF</Button>
                     <Button variant="outline-primary">Other</Button>
                   </td>
-                  <td>Location info</td>
                   <td>
-                    <Button variant="danger" onClick={() => deleteTask(task.id)}>
+                    <Button 
+                      variant="danger" 
+                      onClick={() => deleteTask(task.id)} 
+                      className="delete-button"
+                    >
                       <MdDelete size={20} />
                     </Button>
                   </td>
@@ -171,6 +169,26 @@ function ProjectPage() {
 
           .rounded-table tr:last-child td:last-child {
             border-bottom-right-radius: 10px;
+          }
+
+          .delete-button {
+            background-color: transparent;
+            border: none;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            color: red;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            transition: background-color 0.3s ease;
+          }
+
+          .delete-button:hover {
+            background-color: #f8d7da;
+            border-radius: 50%;
           }
         `}
       </style>
