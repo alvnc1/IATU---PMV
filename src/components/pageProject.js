@@ -99,7 +99,6 @@ function ProjectPage() {
                   <td>-</td>
                   <td>
                     <Button variant="outline-primary" className="me-2">PDF</Button>
-                    <Button variant="outline-primary">Other</Button>
                   </td>
                   <td>
                     <Button 

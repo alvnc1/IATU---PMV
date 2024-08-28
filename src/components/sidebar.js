@@ -51,10 +51,12 @@ function Sidebar() {
             <MdAddBox className="sidebar-icon" /> Nuevo Proyecto
           </Link>
         </Nav.Item>
-        
-        {/* Aquí comenzamos un nuevo div que empuja los elementos hacia abajo */}
-        <div className="sidebar-bottom">
-          <div className="sidebar-divider"></div>
+      </Nav>
+
+      {/* Separamos el contenido principal del contenido que va al fondo */}
+      <div className="sidebar-bottom">
+        <div className="sidebar-divider"></div>
+        <Nav className="flex-column">
           <Nav.Item>
             <Link to="/projects" className="nav-link">
               <MdApps className="sidebar-icon" /> Proyectos
@@ -65,8 +67,8 @@ function Sidebar() {
               <MdAccountCircle className="sidebar-icon" /> {userDetails ? `${userDetails.firstName} ${userDetails.lastName}` : 'Mi Cuenta'}
             </div>
           </Nav.Item>
-        </div>
-      </Nav>
+        </Nav>
+      </div>
     </div>
   );
 }

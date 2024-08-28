@@ -10,38 +10,39 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-  }
-  
-  .sidebar-header h4 {
+    justify-content: space-between; /* Ajuste aquí */
+}
+
+.sidebar-header h4 {
     color: white;
     text-align: center;
     margin-bottom: 30px;
-  }
-  
-  .nav-link {
+}
+
+.nav-link {
     color: white;
     margin: 10px 0;
     display: flex;
     align-items: center;
     padding: 10px 15px;
     font-size: 16px;
-  }
-  
-  .nav-link:hover {
+}
+
+.nav-link:hover {
     background-color: #23272a;
     color: white;
-  }
-  
-  .sidebar-icon {
+}
+
+.sidebar-icon {
     margin-right: 10px;
-  }
-  
-  .sidebar-divider {
+}
+
+.sidebar-divider {
     height: 1px;
     background-color: #3a3d42;
     margin: 15px 0;
-  }
-  
-  .sidebar-bottom {
-    margin-top: auto;
-  }
+}
+
+.sidebar-bottom {
+    margin-top: auto; /* Asegura que esté en la parte inferior */
+}
