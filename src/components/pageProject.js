@@ -4,11 +4,12 @@ import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
-import { MdDelete } from "react-icons/md";
+import { MdDelete, MdPlayArrow } from "react-icons/md"; // Importa el ícono de Play
 import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from "./firebase";
 import { useNavigate } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
+import './css/projectPage.css';
 
 function ProjectPage() {
   const { id } = useParams();
@@ -84,11 +85,11 @@ function ProjectPage() {
           <Table striped bordered hover responsive className="rounded-table">
             <thead>
               <tr>
-                <th>File name</th>
-                <th>Uploaded</th>
-                <th>Status</th>
-                <th>Download</th>
-                <th>Action</th>
+                <th>Nombre</th>
+                <th>Subido</th>
+                <th>Estado</th>
+                <th>Descarga</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -98,16 +99,29 @@ function ProjectPage() {
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
                   <td>-</td>
                   <td>
-                    <Button variant="outline-primary" className="me-2">PDF</Button>
+                    <Button 
+                    variant="outline-primary"
+                    onClick={() => alert('Play Task')}  
+                    className="me-2 pdf-button">PDF
+                    </Button>
                   </td>
                   <td>
-                    <Button 
-                      variant="danger" 
-                      onClick={() => deleteTask(task.id)} 
-                      className="delete-button"
-                    >
-                      <MdDelete size={20} />
-                    </Button>
+                    <div className="action-buttons">
+                      <Button 
+                        variant="success" 
+                        onClick={() => alert('Play Task')} 
+                        className="play-button"
+                      >
+                        <MdPlayArrow size={20} />
+                      </Button>
+                      <Button 
+                        variant="danger" 
+                        onClick={() => deleteTask(task.id)} 
+                        className="delete-button"
+                      >
+                        <MdDelete size={20} />
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -137,60 +151,6 @@ function ProjectPage() {
           </Modal.Body>
         </Modal>
       )}
-      <style>
-        {`
-          .rounded-table {
-            border-radius: 10px;
-            overflow: hidden;
-          }
-
-          .rounded-table th:first-child, 
-          .rounded-table td:first-child {
-            border-left: none;
-          }
-
-          .rounded-table th:last-child, 
-          .rounded-table td:last-child {
-            border-right: none;
-          }
-
-          .rounded-table th:first-child {
-            border-top-left-radius: 10px;
-          }
-
-          .rounded-table th:last-child {
-            border-top-right-radius: 10px;
-          }
-
-          .rounded-table tr:last-child td:first-child {
-            border-bottom-left-radius: 10px;
-          }
-
-          .rounded-table tr:last-child td:last-child {
-            border-bottom-right-radius: 10px;
-          }
-
-          .delete-button {
-            background-color: transparent;
-            border: none;
-            padding: 0;
-            margin: 0;
-            cursor: pointer;
-            color: red;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 30px;
-            height: 30px;
-            transition: background-color 0.3s ease;
-          }
-
-          .delete-button:hover {
-            background-color: #f8d7da;
-            border-radius: 50%;
-          }
-        `}
-      </style>
     </div>
   );
 }

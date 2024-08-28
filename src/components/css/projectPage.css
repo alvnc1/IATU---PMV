@@ -1,32 +1,86 @@
-.table-fixed {
-    table-layout: fixed;
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0; /* Elimina los espacios entre las celdas para aplicar bordes redondeados */
-  }
-  
-  .table-fixed th,
-  .table-fixed td {
-    border: 1px solid #dee2e6; /* Estilo de borde */
-    padding: 8px;
-    text-align: center;
-    vertical-align: middle;
-  }
-  
-  .table-fixed th {
-    border-top-left-radius: 10px; /* Redondea las esquinas superiores */
-    border-top-right-radius: 10px;
-    background-color: #f8f9fa; /* Color de fondo del encabezado */
-    font-weight: bold;
-  }
-  
-  .table-fixed tbody tr:first-child td {
-    border-top-left-radius: 10px; /* Redondea las esquinas superiores */
-    border-top-right-radius: 10px;
-  }
-  
-  .table-fixed tbody tr:last-child td {
-    border-bottom-left-radius: 10px; /* Redondea las esquinas inferiores */
-    border-bottom-right-radius: 10px;
-  }
-  
+.rounded-table {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.rounded-table th:first-child, 
+.rounded-table td:first-child {
+  border-left: none;
+}
+
+.rounded-table th:last-child, 
+.rounded-table td:last-child {
+  border-right: none;
+}
+
+.rounded-table th:first-child {
+  border-top-left-radius: 10px;
+}
+
+.rounded-table th:last-child {
+  border-top-right-radius: 10px;
+}
+
+.rounded-table tr:last-child td:first-child {
+  border-bottom-left-radius: 10px;
+}
+
+.rounded-table tr:last-child td:last-child {
+  border-bottom-right-radius: 10px;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+}
+
+.play-button {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  margin-right: 5px;
+  cursor: pointer;
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  transition: background-color 0.3s ease;
+}
+
+.play-button:hover {
+  background-color: #d4edda;
+  border-radius: 50%;
+}
+
+.delete-button {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  transition: background-color 0.3s ease;
+}
+
+.delete-button:hover {
+  background-color: #f8d7da;
+  border-radius: 50%;
+}
+
+.pdf-button {
+  color: black;
+  border-color: black;
+}
+
+.pdf-button:hover {
+  background-color: #333;
+  color: white;
+  border-color: #333;
+}
