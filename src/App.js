@@ -12,6 +12,7 @@ import MyProjects from "./components/myProjects";
 import NewProject from "./components/newProject";
 import ProjectPage from './components/projectpage';
 import NewTask from "./components/newtask";
+import Sidebar from "./components/sidebar";
 
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
             <Route path="/newproject" element={<NewProject />} />
             <Route path="/project/:id" element={<ProjectPage />} />
             <Route path="/newtask/:id" element={<NewTask />} />
+            <Route path="/sidebar" element={<Sidebar />} />
           </Routes>
           <ToastContainer />
         </ConditionalWrapper> 

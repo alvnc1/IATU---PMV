@@ -1,43 +1,20 @@
 import React, { useState } from "react";
 import { useNavigate } from 'react-router-dom';
-import NavBar from "./navBar";
-import "../login-register.css";
+import Sidebar from "./sidebar"; 
 import Container from "react-bootstrap/Container";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
-import { db } from "./firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { MdSave, MdShare, MdEdit } from "react-icons/md";
+import { db, storage } from "./firebase"; 
+import { doc, setDoc, collection } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage"; 
 
 function NewProject() {
-    const [selectedOption, setSelectedOption] = useState('');
-    const [inputValue, setInputValue] = useState('');
-    const [tipoInput, setTipoInput] = useState('enlace');
-    const [webLink, setWebLink] = useState('');
-    const [imagenFile, setImagenFile] = useState(null);
     const [nombreProyecto, setNombreProyecto] = useState('');
     const [descripcionProyecto, setDescripcionProyecto] = useState('');
-    const navigate = useNavigate(); // Crear instancia de useNavigate
-
-    const handleSelectChange = (e) => {
-        setSelectedOption(e.target.value);
-    };
-
-    const handleInputChange = (e) => {
-        setInputValue(e.target.value);
-    };
-
-    const handleTipoInputChange = (e) => {
-        setTipoInput(e.target.value);
-    };
-
-    const handleWebLinkChange = (e) => {
-        setWebLink(e.target.value);
-    };
-
-    const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        setImagenFile(file);
-    };
+    const [files, setFiles] = useState([]);
+    const [uploadStatus, setUploadStatus] = useState({});
+    const navigate = useNavigate();
 
     const handleNombreProyectoChange = (e) => {
         setNombreProyecto(e.target.value);
@@ -47,34 +24,53 @@ function NewProject() {
         setDescripcionProyecto(e.target.value);
     };
 
+    const handleFileUpload = async (file) => {
+        const fileId = Date.now().toString();
+        setUploadStatus(prevStatus => ({
+            ...prevStatus,
+            [fileId]: 'uploading'
+        }));
+
+        try {
+            const storageRef = ref(storage, `uploads/${fileId}_${file.name}`);
+            await uploadBytes(storageRef, file);
+            const downloadUrl = await getDownloadURL(storageRef);
+
+            setFiles(prevFiles => [...prevFiles, { id: fileId, name: file.name, url: downloadUrl }]);
+            setUploadStatus(prevStatus => ({
+                ...prevStatus,
+                [fileId]: 'success'
+            }));
+        } catch (error) {
+            setUploadStatus(prevStatus => ({
+                ...prevStatus,
+                [fileId]: 'error'
+            }));
+        }
+    };
+
+    const handleFilesChange = (e) => {
+        const filesArray = Array.from(e.target.files);
+        filesArray.forEach(file => handleFileUpload(file));
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Objeto con los datos a guardar
             const proyecto = {
                 nombreProyecto,
                 descripcionProyecto,
-                fechaCreacion: new Date().toISOString() // Guardar la fecha de creación en formato ISO
+                fechaCreacion: new Date().toISOString(),
+                files // Guardamos la información de los archivos subidos
             };
 
-            // Guardar documento en Firestore
             await setDoc(doc(db, "proyectos", Date.now().toString()), proyecto);
 
-            // Limpiar los campos después de guardar
-            setSelectedOption('');
-            setInputValue('');
-            setTipoInput('enlace');
-            setWebLink('');
-            setImagenFile(null);
             setNombreProyecto('');
             setDescripcionProyecto('');
-
-            // Mostrar los datos en la consola
-            console.log("Datos guardados en Firebase:", proyecto);
+            setFiles([]);
 
             alert("Proyecto guardado correctamente!");
-
-            // Redirigir a /projects
             navigate('/projects');
         } catch (error) {
             console.error("Error al guardar proyecto en Firebase: ", error);
@@ -83,64 +79,111 @@ function NewProject() {
     };
 
     return (
-        <div>
-            <NavBar />
+        <div style={{ display: 'flex' }}>
+            <Sidebar />
 
-            <Container
-                style={{
-                    marginTop: "20px",
-                    backgroundColor: "white",
-                    borderRadius: "10px",
-                    padding: "20px",
-                    width: "90%", // Ancho del contenedor interno
-                    maxWidth: "1200px", // Ancho máximo del contenedor interno
-                    height: "80vh", // Altura del contenedor interno
-                    overflowY: "auto", // Scroll vertical si es necesario
-                    boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)", // Sombra ligera
-                }}
-            >
-                <div className="d-flex justify-content-between align-items-center">
-                    <h2 style={{ textAlign: "left", margin: 0 }}>Creación de Proyecto</h2>
-                </div>
-                <hr
+            <div style={{ marginLeft: '250px', width: '100%' }}>
+                <Container
+                    fluid
                     style={{
-                        color: '#000000',
-                        backgroundColor: '#000000',
-                        height: 5
+                        marginTop: "20px",
+                        backgroundColor: "white",
+                        borderRadius: "10px",
+                        padding: "20px",
+                        width: "95%", 
+                        maxWidth: "1200px",
+                        height: "85vh",
+                        overflowY: "auto",
+                        boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)",
                     }}
-                />
-                <div className="d-flex justify-content-between align-items-center">
-                    <h5 style={{ textAlign: "left", marginTop: '20px' }}>Nombre del Proyecto</h5>
-                </div>
-                <Form.Group controlId="formBasicNombreProyecto">
-                    <Form.Control
-                        type="text"
-                        placeholder="Escribe el nombre del proyecto..."
-                        value={nombreProyecto}
-                        onChange={handleNombreProyectoChange}
-                    />
-                </Form.Group>
-
-                <div className="d-flex justify-content-between align-items-center">
-                    <h5 style={{ textAlign: "left", marginTop: '20px' }}>Descripción del Proyecto</h5>
-                </div>
-                <Form.Group controlId="formBasicDescripcionProyecto">
-                    <Form.Control
-                        type="text"
-                        placeholder="Da una breve descripción del proyecto..."
-                        value={descripcionProyecto}
-                        onChange={handleDescripcionProyectoChange}
-                    />
-                </Form.Group>
-                
-                <Form onSubmit={handleSubmit}>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '50px' }}>
-                        <Button variant="primary" type="submit">
-                            Guardar Proyecto
-                        </Button>
+                >
+                    <div className="d-flex justify-content-between align-items-center">
+                        <h2 style={{ textAlign: "left", margin: 0 }}>Nuevo Proyecto</h2>
+                        <div>
+                            <Button variant="outline-secondary" style={{ marginRight: '10px' }}>
+                                <MdShare size={20} style={{ marginRight: '5px' }} />
+                                Share
+                            </Button>
+                            <Button variant="primary" onClick={handleSubmit}>
+                                <MdSave size={20} style={{ marginRight: '5px' }} />
+                                Guardar
+                            </Button>
+                        </div>
                     </div>
-                </Form>
-            </Container>
+                    <hr style={{ color: '#000000', backgroundColor: '#000000', height: 2 }} />
+                    
+                    <Form onSubmit={handleSubmit}>
+                        <Form.Group controlId="formBasicNombreProyecto">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Nombre del Proyecto</Form.Label>
+                            <Form.Control
+                                type="text"
+                                placeholder="Escribe el nombre del proyecto..."
+                                value={nombreProyecto}
+                                onChange={handleNombreProyectoChange}
+                            />
+                        </Form.Group>
+
+                        <Form.Group controlId="formBasicDescripcionProyecto">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Descripción del Proyecto</Form.Label>
+                            <Form.Control
+                                as="textarea"
+                                rows={3}
+                                placeholder="Da una breve descripción del proyecto..."
+                                value={descripcionProyecto}
+                                onChange={handleDescripcionProyectoChange}
+                            />
+                        </Form.Group>
+
+                        <Form.Group controlId="formBasicFiles">
+                        <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Subir Archivos</Form.Label>
+                        <div
+                            style={{
+                                border: '2px dashed #ccc',
+                                borderRadius: '10px',
+                                padding: '20px',
+                                textAlign: 'center',
+                                marginBottom: '20px',
+                                height: '200px',
+                                display: 'flex',          // Agregado para hacer uso de flexbox
+                                justifyContent: 'center', // Centra el contenido horizontalmente
+                                alignItems: 'center'      // Centra el contenido verticalmente
+                            }}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                handleFilesChange(e);
+                            }}
+                            onDragOver={(e) => e.preventDefault()}
+                        >
+                            <input
+                                type="file"
+                                multiple
+                                onChange={handleFilesChange}
+                                style={{ display: 'none' }}
+                                id="fileUpload"
+                            />
+                            <label htmlFor="fileUpload" style={{ cursor: 'pointer' }}>
+                            Arrastra y suelta tus archivos aquí o <span style={{ color: '#007bff', textDecoration: 'underline' }}>explora</span> para subir.
+                            </label>
+                        </div>
+                    </Form.Group>
+
+                        <Form.Group controlId="formBasicFiles">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Archivos Subidos</Form.Label>
+                            {files.map((file) => (
+                                <div key={file.id} style={{ marginBottom: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span>{file.name}</span>
+                                        {uploadStatus[file.id] === 'uploading' && <span>Cargando...</span>}
+                                        {uploadStatus[file.id] === 'success' && <span style={{ color: 'green' }}>Subido</span>}
+                                        {uploadStatus[file.id] === 'error' && <span style={{ color: 'red' }}>Error al subir</span>}
+                                    </div>
+                                </div>
+                            ))}
+                        </Form.Group>
+
+                    </Form>
+                </Container>
+            </div>
         </div>
     );
 }

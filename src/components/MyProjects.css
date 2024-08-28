@@ -54,3 +54,54 @@
   background-color: #17884a;
   color: #111;
 }
+
+
+.project-tile:hover {
+  background-color: #f0f0f0; /* Cambio de color al pasar el cursor */
+}
+
+.project-tile:active {
+  background-color: #dcdcdc; /* Cambio de color al hacer clic */
+}
+
+
+.project-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 15px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.project-tile:hover {
+  background-color: #f0f0f0; /* Cambio de color al pasar el cursor */
+}
+
+.project-tile:active {
+  background-color: #dcdcdc; /* Cambio de color al hacer clic */
+}
+
+.project-tile h5 {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.project-tile .text-muted {
+  font-size: 14px;
+}
+
+.project-tile .btn {
+  margin-right: 10px;
+  width: 48%;
+}
+
+.project-tile .dropdown-toggle::after {
+  display: none;
+}
+
+

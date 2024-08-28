@@ -1,18 +1,12 @@
 import React, { useEffect, useState } from "react";
-import NavBar from "./navBar"; 
+import Sidebar from "./sidebar"; 
 import Container from "react-bootstrap/Container";
-import Row from "react-bootstrap/Row";
-import Col from "react-bootstrap/Col";
+import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
-import Card from 'react-bootstrap/Card';
 import Modal from 'react-bootstrap/Modal';
 import { MdDelete } from "react-icons/md";
 import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from "./firebase";
-import TestRunner from './testRunner';
-import CriteriaPDFGenerator from './CriteriaPDFGenerator'; 
-import ImageFeedbackGenerator from './ImageFeedbackGenerator'; 
-import './MyProjects.css'; 
 import { useNavigate } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
 
@@ -23,14 +17,14 @@ function ProjectPage() {
   const [showModal, setShowModal] = useState(false);
   const [sortOrder, setSortOrder] = useState('asc');
   const [testStatus, setTestStatus] = useState({});
-  const [projectName, setProjectName] = useState(''); // Nuevo estado para el nombre del proyecto
+  const [projectName, setProjectName] = useState(''); 
   const navigate = useNavigate();
 
   const getProjectDetails = async () => {
     try {
       const projectDoc = await getDoc(doc(db, 'proyectos', id));
       if (projectDoc.exists()) {
-        setProjectName(projectDoc.data().nombreProyecto); // Asigna el nombre del proyecto al estado
+        setProjectName(projectDoc.data().nombreProyecto);
       } else {
         console.log("El documento no existe.");
       }
@@ -51,11 +45,6 @@ function ProjectPage() {
       }
     });
     setTasks(tasksList);
-    const initialTestStatus = {};
-    tasksList.forEach(task => {
-      initialTestStatus[task.id] = false;
-    });
-    setTestStatus(initialTestStatus);
   };
 
   const deleteTask = async (taskId) => {
@@ -79,69 +68,54 @@ function ProjectPage() {
     setShowModal(false);
   };
 
-  const handleTestRun = async (taskId) => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      setTestStatus(prevStatus => ({
-        ...prevStatus,
-        [taskId]: true
-      }));
-    } catch (error) {
-      console.error('Error al ejecutar la prueba: ', error);
-      alert('Hubo un error al ejecutar la prueba');
-    }
-  };
-
   useEffect(() => {
     getProjectDetails(); 
     getTasks();
   }, []);
 
   return (
-    <div>
-      <NavBar />
-      <Container
-        style={{
-          marginTop: "20px",
-          backgroundColor: "white",
-          borderRadius: "10px",
-          padding: "20px",
-          width: "90%",
-          maxWidth: "1200px",
-          height: "80vh",
-          overflowY: "auto",
-          boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)",
-        }}
-      >
+    <div style={{ display: 'flex' }}>
+      <Sidebar />
+      <Container fluid style={{ marginLeft: '230px', padding: '20px', minHeight: '100vh', overflowY: 'auto', overflowX: 'hidden' }}>
         <div className="d-flex justify-content-between align-items-center">
-          <h2 style={{ textAlign: "left", margin: 0 }}>Proyecto: {projectName}</h2>
+          <h2 style={{ textAlign: "left", margin: 0 }}>Proyecto {projectName}</h2>
         </div>
         <div style={{ marginTop: '20px' }}>
-          <Row>
-            {tasks.map((task) => (
-              <Col key={task.id} xs={12} sm={6} md={4} lg={3} className="mb-4">
-                <Card className="project-card">
-                <Card.Img variant="top" src={require("./images/bk.png")} alt="Project Image" />
-                  <Card.Body className="text-center">
-                    <Card.Title>{task.nombreTarea}</Card.Title>
-                    <div className="d-flex justify-content-center">
-                      <Button variant="primary" className="mb-2 feed-btn" onClick={() => handleShowModal(task)}>Ver Tarea</Button>
-                      <Button variant="danger" className="danger-btn mb-2" onClick={() => deleteTask(task.id)}>
-                        <MdDelete size={24} />
-                      </Button>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            ))}
-            <Col xs={12} sm={6} md={4} lg={3} className="mb-4">
-              <Card className="h-100 d-flex justify-content-center align-items-center">
-                <Button href={`/newtask/${id}`} variant="outline-primary" className="w-100 h-100">
-                  + Nueva Tarea
-                </Button>
-              </Card>
-            </Col>
-          </Row>
+          <Table striped bordered hover responsive className="table-fixed">
+            <thead>
+              <tr>
+                <th>File name</th>
+                <th>Source</th>
+                <th>Uploaded</th>
+                <th>Status</th>
+                <th>Data</th>
+                <th>Download</th>
+                <th>Location</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map((task) => (
+                <tr key={task.id}>
+                  <td className="text-truncate">{task.nombreTarea}</td>
+                  <td>{task.source || 'N/A'}</td>
+                  <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
+                  <td>Ready</td>
+                  <td>Data available</td>
+                  <td>
+                    <Button variant="outline-primary" className="me-2">PDF</Button>
+                    <Button variant="outline-primary">Other</Button>
+                  </td>
+                  <td>Location info</td>
+                  <td>
+                    <Button variant="danger" onClick={() => deleteTask(task.id)}>
+                      <MdDelete size={20} />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
         </div>
       </Container>
 
@@ -151,7 +125,7 @@ function ProjectPage() {
             <Modal.Title>{selectedTask.nombreTarea}</Modal.Title>
           </Modal.Header>
           <Modal.Body>
-            <h5>Archivos Subidos</h5>
+            <h5>Uploaded Files</h5>
             <div>
               {selectedTask.files && selectedTask.files.length > 0 ? (
                 selectedTask.files.map((file) => (
@@ -160,30 +134,7 @@ function ProjectPage() {
                   </div>
                 ))
               ) : (
-                <p>No se han subido archivos para esta tarea.</p>
-              )}
-            </div>
-            <div className="d-flex flex-column align-items-stretch">
-              {selectedTask.imageUrl && (
-                <>
-                  <img src={selectedTask.imageUrl} alt="Task Image" style={{ width: '100%', marginBottom: '10px' }} />
-                  <ImageFeedbackGenerator imageUrl={selectedTask.imageUrl} />
-                </>
-              )}
-              {!selectedTask.imageUrl && (
-                <>
-                  <Button
-                    variant="light"
-                    className="neutral-btn mb-2"
-                    onClick={() => handleTestRun(selectedTask.id)}
-                    disabled={testStatus[selectedTask.id]}
-                  >
-                    <TestRunner task={selectedTask} onTestRun={() => handleTestRun(selectedTask.id)} />
-                  </Button>
-                  <Button variant="light" className="feed-btn mb-2" disabled={!testStatus[selectedTask.id]}>
-                    <CriteriaPDFGenerator task={selectedTask} />
-                  </Button>
-                </>
+                <p>No files uploaded for this task.</p>
               )}
             </div>
           </Modal.Body>
