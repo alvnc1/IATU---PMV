@@ -79,7 +79,7 @@ function ProjectPage() {
       <Sidebar />
       <Container fluid style={{ marginLeft: '230px', padding: '20px', minHeight: '100vh', overflowY: 'auto', overflowX: 'hidden' }}>
         <div className="d-flex justify-content-between align-items-center">
-          <h2 style={{ textAlign: "left", margin: 0 }}>Proyecto {projectName}</h2>
+        <h2 className="page-title">Proyecto {projectName}</h2>
         </div>
         <div style={{ marginTop: '20px' }}>
           <Table striped bordered hover responsive className="rounded-table">

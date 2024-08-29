@@ -84,3 +84,8 @@
   color: white;
   border-color: #333;
 }
+
+.page-title {
+  margin-left: 20px;
+  margin-top: 16px;
+}

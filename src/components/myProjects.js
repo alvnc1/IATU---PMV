@@ -42,7 +42,7 @@ function MyProjects() {
 
   const shareProject = (projectId) => {
     alert(`Compartir proyecto con ID: ${projectId}`);
-    // Aquí puedes agregar la funcionalidad de compartir, por ejemplo copiar un enlace o abrir una ventana de compartir
+    // Aquí agregar la funcionalidad de compartir
   };
 
   useEffect(() => {
@@ -55,7 +55,7 @@ function MyProjects() {
       <div style={{ marginLeft: '250px', width: '100%' }}>
         <Container fluid style={{ padding: '20px', backgroundColor: '#f8f9fa' }}>
           <div className="d-flex justify-content-between align-items-center mb-4">
-            <h2>Mis Proyectos</h2>
+            <h2 className="project-header">Mis Proyectos</h2>
           </div>
           <Row>
             {projects.map((project) => (
