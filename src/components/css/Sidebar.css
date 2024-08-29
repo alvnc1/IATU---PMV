@@ -10,7 +10,7 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    justify-content: space-between; /* Ajuste aquí */
+    justify-content: space-between;
 }
 
 .sidebar-header h4 {
@@ -44,5 +44,13 @@
 }
 
 .sidebar-bottom {
-    margin-top: auto; /* Asegura que esté en la parte inferior */
+    margin-top: auto;
 }
+
+.sidebar-logo {
+    width: 90%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+  

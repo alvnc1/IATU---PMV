@@ -4,7 +4,10 @@ import { Link } from 'react-router-dom';
 import { MdAddBox, MdAccountCircle, MdApps } from "react-icons/md";
 import { auth, db } from "./firebase";
 import { doc, getDoc } from "firebase/firestore";
-import './css/Sidebar.css'; // Archivo CSS para estilos adicionales
+import './css/Sidebar.css';
+
+// Importa tu imagen
+import logo from './images/logo_v2.png';
 
 function Sidebar() {
   const [userDetails, setUserDetails] = useState(null);
@@ -42,7 +45,9 @@ function Sidebar() {
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <h4>IATU</h4>
+        <Link to="/projects">
+          <img src={logo} alt="Logo" className="sidebar-logo" />
+        </Link>
       </div>
       <div className="sidebar-divider"></div>
       <Nav className="flex-column">
@@ -53,7 +58,6 @@ function Sidebar() {
         </Nav.Item>
       </Nav>
 
-      {/* Separamos el contenido principal del contenido que va al fondo */}
       <div className="sidebar-bottom">
         <div className="sidebar-divider"></div>
         <Nav className="flex-column">
