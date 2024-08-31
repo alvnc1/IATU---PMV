@@ -57,7 +57,7 @@ html,
 }
 
 .auth-wrapper .form-control:focus {
-  border-color: #167bff;
+  border-color: #333333;
   box-shadow: none;
 }
 
@@ -82,7 +82,7 @@ html,
 }
 
 .forgot-password a {
-  color: #167bff;
+  color: #D4AF37;
 }
 
 .continue-p {
@@ -100,4 +100,31 @@ html,
 
 .logo {
   max-width: 150px; /* Ajusta el tamaño máximo del logo según tu necesidad */
+}
+
+.btn-primary {
+  background-color: #000000;
+  border-color: #000000;
+  color: #ffffff;
+  border-radius: 5px;
+  padding: 10px;
+  font-size: 16px;
+  width: 100%;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.btn-primary:hover {
+  background-color: #333333;
+  border-color: #333333;
+  color: #ffffff;
+}
+
+/* Evitar el color azul al hacer clic */
+.btn-primary:active,
+.btn-primary:focus,
+.btn-primary:focus:active {
+  background-color: #333333;
+  border-color: #333333;
+  color: #ffffff;
+  box-shadow: none;
 }

@@ -4,7 +4,7 @@ import { auth, db } from "./firebase";
 import { setDoc, doc } from "firebase/firestore";
 import { toast } from "react-toastify";
 import './css/login-register.css';
-import img from './images/logo.png';
+import img from './images/logo_v2_black.png';
 
 function Register() {
   const [email, setEmail] = useState("");
