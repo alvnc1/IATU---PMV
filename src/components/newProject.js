@@ -99,13 +99,13 @@ function NewProject() {
                 >
                     <div className="d-flex justify-content-between align-items-center">
                         <h2 style={{ textAlign: "left", margin: 0 }}>Nuevo Proyecto</h2>
-                        <div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', }}>
                             <Button variant="outline-secondary" style={{ marginRight: '10px' }}>
                                 <MdShare size={20} style={{ marginRight: '5px' }} />
                                 Share
                             </Button>
                             <Button variant="primary" onClick={handleSubmit}>
-                                <MdSave size={20} style={{ marginRight: '5px' }} />
+                                <MdSave size={18} style={{ marginRight: '5px'}} />
                                 Guardar
                             </Button>
                         </div>
