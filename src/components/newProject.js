@@ -4,7 +4,7 @@ import Sidebar from "./sidebar";
 import Container from "react-bootstrap/Container";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
-import { MdSave, MdShare } from "react-icons/md";
+import { MdSave } from "react-icons/md";
 import { db, storage } from "./firebase"; 
 import { doc, setDoc, /*collection*/ } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"; 
@@ -99,11 +99,7 @@ function NewProject() {
                 >
                     <div className="d-flex justify-content-between align-items-center">
                         <h2 style={{ textAlign: "left", margin: 0 }}>Nuevo Proyecto</h2>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', }}>
-                            <Button variant="outline-secondary" style={{ marginRight: '10px' }}>
-                                <MdShare size={20} style={{ marginRight: '5px' }} />
-                                Share
-                            </Button>
+                        <div>
                             <Button variant="primary" onClick={handleSubmit}>
                                 <MdSave size={18} style={{ marginRight: '5px'}} />
                                 Guardar
