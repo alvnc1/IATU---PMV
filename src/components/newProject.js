@@ -4,9 +4,9 @@ import Sidebar from "./sidebar";
 import Container from "react-bootstrap/Container";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
-import { MdSave, MdShare, MdEdit } from "react-icons/md";
+import { MdSave, MdShare } from "react-icons/md";
 import { db, storage } from "./firebase"; 
-import { doc, setDoc, collection } from "firebase/firestore";
+import { doc, setDoc, /*collection*/ } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"; 
 
 function NewProject() {
