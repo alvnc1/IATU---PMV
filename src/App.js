@@ -36,7 +36,7 @@ function App() {
             <Route path="/projects" element={<MyProjects />} />
             <Route path="/newproject" element={<NewProject />} />
             <Route path="/project/:id" element={<ProjectPage />} />
-            <Route path="/newTask" element={<NewTask />} />
+            <Route path="/newTask/:id" element={<NewTask />} />
             <Route path="/sidebar" element={<Sidebar />} />
           </Routes>
           <ToastContainer />

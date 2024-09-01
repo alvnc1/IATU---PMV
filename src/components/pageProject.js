@@ -70,8 +70,9 @@ function ProjectPage() {
   };
 
   const handleAddTask = () => {
-    navigate(`/newTask`);
+    navigate(`/newTask/${id}`);
   };
+  
 
   useEffect(() => {
     getProjectDetails(); 
