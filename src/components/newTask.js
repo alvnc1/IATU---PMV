@@ -97,10 +97,12 @@ function NewTask() {
             >
                 <div className="d-flex justify-content-between align-items-center">
                     <h2 style={{ textAlign: "left", margin: 0 }}>Nueva Tarea</h2>
-                    <Button variant="primary" onClick={handleSubmit}>
-                        <MdSave size={18} style={{ marginRight: '5px'}} />
-                        Guardar
-                    </Button>
+                    <div>
+                        <Button variant="primary" onClick={handleSubmit}>
+                            <MdSave size={18} style={{ marginRight: '5px'}} />
+                            Guardar
+                        </Button>
+                    </div>
                 </div>
                 <hr style={{ color: '#000000', backgroundColor: '#000000', height: 2 }} />
 
