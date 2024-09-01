@@ -4,7 +4,7 @@ import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
-import { MdDelete, MdPlayArrow } from "react-icons/md"; // Importa el ícono de Play
+import { MdDelete, MdPlayArrow, MdAdd } from "react-icons/md"; // Importa el ícono de agregar
 import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from "./firebase";
 import { useNavigate } from 'react-router-dom';
@@ -69,6 +69,10 @@ function ProjectPage() {
     setShowModal(false);
   };
 
+  const handleAddTask = () => {
+    navigate(`/newTask`);
+  };
+
   useEffect(() => {
     getProjectDetails(); 
     getTasks();
@@ -79,7 +83,11 @@ function ProjectPage() {
       <Sidebar />
       <Container fluid style={{ marginLeft: '230px', padding: '20px', minHeight: '100vh', overflowY: 'auto', overflowX: 'hidden' }}>
         <div className="d-flex justify-content-between align-items-center">
-        <h2 className="page-title">Proyecto {projectName}</h2>
+          <h2 className="page-title">Proyecto {projectName}</h2>
+          <Button variant="outline-primary" className="d-flex align-items-center add-button" onClick={handleAddTask}>
+            <MdAdd size={20} style={{ marginRight: '5px'}} />
+            Agregar
+          </Button>
         </div>
         <div style={{ marginTop: '20px' }}>
           <Table striped bordered hover responsive className="rounded-table">

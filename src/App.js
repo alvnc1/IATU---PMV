@@ -11,6 +11,7 @@ import { auth } from "./components/firebase";
 import MyProjects from "./components/myProjects";
 import NewProject from "./components/newProject";
 import ProjectPage from './components/pageProject';
+import NewTask from './components/newTask';
 import Sidebar from "./components/sidebar";
 
 
@@ -35,6 +36,7 @@ function App() {
             <Route path="/projects" element={<MyProjects />} />
             <Route path="/newproject" element={<NewProject />} />
             <Route path="/project/:id" element={<ProjectPage />} />
+            <Route path="/newTask" element={<NewTask />} />
             <Route path="/sidebar" element={<Sidebar />} />
           </Routes>
           <ToastContainer />

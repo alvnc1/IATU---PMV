@@ -89,3 +89,31 @@
   margin-left: 20px;
   margin-top: 16px;
 }
+
+.add-button {
+  border-radius: 12px; /* Ajusta este valor según el nivel de redondez deseado */
+  padding: 6px 12px; /* Ajusta el padding para mantener una buena proporción */
+  transition: background-color 0.3s ease;
+  background-color: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+.add-button:hover {
+  background-color: #333333;
+  border-color: #333333;
+  color: #ffffff;
+}
+
+.add-button:active {
+  background-color: #333333; /* Color de fondo al hacer clic */
+  border-color: #333333; /* Cambia también el color del borde */
+  color: white; /* Cambia el color del texto */
+}
+
+.add-button:focus {
+  background-color: #000000 !important; /* Color de fondo al hacer clic */
+  border-color: #333 !important; /* Cambia también el color del borde */
+  color: white !important; /* Cambia el color del texto */
+  box-shadow: none !important; /* Elimina el resplandor de enfoque */
+}

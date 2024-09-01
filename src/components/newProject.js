@@ -6,12 +6,13 @@ import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import { MdSave } from "react-icons/md";
 import { db, storage } from "./firebase"; 
-import { doc, setDoc, /*collection*/ } from "firebase/firestore";
+import { doc, setDoc, collection } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"; 
 
 function NewProject() {
     const [nombreProyecto, setNombreProyecto] = useState('');
     const [descripcionProyecto, setDescripcionProyecto] = useState('');
+    const [nombreTarea, setNombreTarea] = useState('');
     const [files, setFiles] = useState([]);
     const [uploadStatus, setUploadStatus] = useState({});
     const navigate = useNavigate();
@@ -22,6 +23,10 @@ function NewProject() {
 
     const handleDescripcionProyectoChange = (e) => {
         setDescripcionProyecto(e.target.value);
+    };
+
+    const handleNombreTareaChange = (e) => {
+        setNombreTarea(e.target.value);
     };
 
     const handleFileUpload = async (file) => {
@@ -57,24 +62,37 @@ function NewProject() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const proyecto = {
+            // Crear y guardar el proyecto primero
+            const proyectoRef = doc(collection(db, "proyectos"));
+            const proyectoData = {
                 nombreProyecto,
                 descripcionProyecto,
-                fechaCreacion: new Date().toISOString(),
-                files // Guardamos la información de los archivos subidos
+                fechaCreacion: new Date().toISOString()
             };
+            await setDoc(proyectoRef, proyectoData);
 
-            await setDoc(doc(db, "proyectos", Date.now().toString()), proyecto);
+            // Luego crear y guardar la tarea dentro del proyecto recién creado
+            if (nombreTarea || files.length > 0) {
+                const tareaRef = doc(collection(proyectoRef, "tasks"));
+                const tareaData = {
+                    nombreTarea,
+                    fechaCreacion: new Date().toISOString(),
+                    files
+                };
+                await setDoc(tareaRef, tareaData);
+            }
 
+            // Limpiar los estados después de guardar
             setNombreProyecto('');
             setDescripcionProyecto('');
+            setNombreTarea('');
             setFiles([]);
 
-            alert("Proyecto guardado correctamente!");
+            alert("Proyecto y tarea guardados correctamente!");
             navigate('/projects');
         } catch (error) {
-            console.error("Error al guardar proyecto en Firebase: ", error);
-            alert("Hubo un error al guardar el proyecto");
+            console.error("Error al guardar proyecto y tarea en Firebase: ", error);
+            alert("Hubo un error al guardar el proyecto y la tarea");
         }
     };
 
@@ -130,40 +148,50 @@ function NewProject() {
                             />
                         </Form.Group>
 
-                        <Form.Group controlId="formBasicFiles">
-                        <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Subir Archivos</Form.Label>
-                        <div
-                            style={{
-                                border: '2px dashed #ccc',
-                                borderRadius: '10px',
-                                padding: '20px',
-                                textAlign: 'center',
-                                marginBottom: '20px',
-                                height: '200px',
-                                display: 'flex',          // Agregado para hacer uso de flexbox
-                                justifyContent: 'center', // Centra el contenido horizontalmente
-                                alignItems: 'center'      // Centra el contenido verticalmente
-                            }}
-                            onDrop={(e) => {
-                                e.preventDefault();
-                                handleFilesChange(e);
-                            }}
-                            onDragOver={(e) => e.preventDefault()}
-                        >
-                            <input
-                                type="file"
-                                multiple
-                                onChange={handleFilesChange}
-                                style={{ display: 'none' }}
-                                id="fileUpload"
+                        <Form.Group controlId="formBasicNombreTarea">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Nombre de la Tarea</Form.Label>
+                            <Form.Control
+                                type="text"
+                                placeholder="Escribe el nombre de la tarea..."
+                                value={nombreTarea}
+                                onChange={handleNombreTareaChange}
                             />
-                            <label htmlFor="fileUpload" style={{ cursor: 'pointer' }}>
-                            Arrastra y suelta tus archivos aquí o <span style={{ color: '#007bff', textDecoration: 'underline' }}>explora</span> para subir.
-                            </label>
-                        </div>
-                    </Form.Group>
+                        </Form.Group>
 
                         <Form.Group controlId="formBasicFiles">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Subir Archivos de la Tarea</Form.Label>
+                            <div
+                                style={{
+                                    border: '2px dashed #ccc',
+                                    borderRadius: '10px',
+                                    padding: '20px',
+                                    textAlign: 'center',
+                                    marginBottom: '20px',
+                                    height: '200px',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center'
+                                }}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    handleFilesChange(e);
+                                }}
+                                onDragOver={(e) => e.preventDefault()}
+                            >
+                                <input
+                                    type="file"
+                                    multiple
+                                    onChange={handleFilesChange}
+                                    style={{ display: 'none' }}
+                                    id="fileUpload"
+                                />
+                                <label htmlFor="fileUpload" style={{ cursor: 'pointer' }}>
+                                    Arrastra y suelta tus archivos aquí o <span style={{ color: '#007bff', textDecoration: 'underline' }}>explora</span> para subir.
+                                </label>
+                            </div>
+                        </Form.Group>
+
+                        <Form.Group controlId="formBasicUploadedFiles">
                             <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Archivos Subidos</Form.Label>
                             {files.map((file) => (
                                 <div key={file.id} style={{ marginBottom: '10px' }}>
