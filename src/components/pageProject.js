@@ -4,7 +4,7 @@ import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
-import { MdDelete, MdPlayArrow, MdAdd } from "react-icons/md"; // Importa el ícono de agregar
+import { MdDelete, MdPlayArrow, MdAdd } from "react-icons/md";
 import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from "./firebase";
 import { useNavigate } from 'react-router-dom';
