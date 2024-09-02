@@ -13,6 +13,7 @@ function NewProject() {
     const [nombreProyecto, setNombreProyecto] = useState('');
     const [descripcionProyecto, setDescripcionProyecto] = useState('');
     const [nombreTarea, setNombreTarea] = useState('');
+    const [urlTarea, setUrlTarea] = useState('');  // Nuevo estado para la URL
     const [files, setFiles] = useState([]);
     const [uploadStatus, setUploadStatus] = useState({});
     const navigate = useNavigate();
@@ -27,6 +28,10 @@ function NewProject() {
 
     const handleNombreTareaChange = (e) => {
         setNombreTarea(e.target.value);
+    };
+
+    const handleUrlTareaChange = (e) => {
+        setUrlTarea(e.target.value);  // Actualiza el estado de la URL
     };
 
     const handleFileUpload = async (file) => {
@@ -72,10 +77,11 @@ function NewProject() {
             await setDoc(proyectoRef, proyectoData);
 
             // Luego crear y guardar la tarea dentro del proyecto recién creado
-            if (nombreTarea || files.length > 0) {
+            if (nombreTarea || urlTarea || files.length > 0) {
                 const tareaRef = doc(collection(proyectoRef, "tasks"));
                 const tareaData = {
                     nombreTarea,
+                    urlTarea,  // Incluye la URL en los datos de la tarea
                     fechaCreacion: new Date().toISOString(),
                     files
                 };
@@ -86,6 +92,7 @@ function NewProject() {
             setNombreProyecto('');
             setDescripcionProyecto('');
             setNombreTarea('');
+            setUrlTarea('');  // Limpiar el estado de la URL
             setFiles([]);
 
             alert("Proyecto y tarea guardados correctamente!");
@@ -155,6 +162,17 @@ function NewProject() {
                                 placeholder="Escribe el nombre de la tarea..."
                                 value={nombreTarea}
                                 onChange={handleNombreTareaChange}
+                            />
+                        </Form.Group>
+
+                        {/* Nuevo campo para la URL de la tarea */}
+                        <Form.Group controlId="formBasicUrlTarea">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>URL de la Tarea</Form.Label>
+                            <Form.Control
+                                type="url"
+                                placeholder="Ingresa la URL relacionada con la tarea..."
+                                value={urlTarea}
+                                onChange={handleUrlTareaChange}
                             />
                         </Form.Group>
 
