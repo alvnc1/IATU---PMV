@@ -4,25 +4,50 @@ import Container from "react-bootstrap/Container";
 import Sidebar from "./sidebar"; 
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
+import Dropdown from 'react-bootstrap/Dropdown';
+import DropdownButton from 'react-bootstrap/DropdownButton';
 import { MdSave } from "react-icons/md";
 import { db, storage } from "./firebase"; 
 import { doc, setDoc, collection } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 
 function NewTask() {
-    const { id: projectId } = useParams();  // Obtén el ID del proyecto desde la URL
+    const { id: projectId } = useParams(); 
     const [nombreTarea, setNombreTarea] = useState('');
-    const [urlTarea, setUrlTarea] = useState(''); // Nuevo estado para la URL
+    const [urlTarea, setUrlTarea] = useState('');
+    const [selectedCategorias, setSelectedCategorias] = useState([]);
     const [files, setFiles] = useState([]);
     const [uploadStatus, setUploadStatus] = useState({});
     const navigate = useNavigate();
+
+    const categorias = [
+        "Página de Inicio",
+        "Orientación de Tareas",
+        "Navegabilidad",
+        "Formularios",
+        "Confianza y Credibilidad",
+        "Calidad del Contenido",
+        "Diagramación y Diseño",
+        "Sección de Búsquedas",
+        "Sección de Reconocimiento de Errores y Retroalimentación"
+    ];
 
     const handleNombreTareaChange = (e) => {
         setNombreTarea(e.target.value);
     };
 
     const handleUrlTareaChange = (e) => {
-        setUrlTarea(e.target.value);  // Actualiza el estado de la URL
+        setUrlTarea(e.target.value);
+    };
+
+    const handleCategoriaChange = (categoria) => {
+        setSelectedCategorias(prevSelected => {
+            if (prevSelected.includes(categoria)) {
+                return prevSelected.filter(c => c !== categoria);
+            } else {
+                return [...prevSelected, categoria];
+            }
+        });
     };
 
     const handleFileUpload = async (file) => {
@@ -59,12 +84,13 @@ function NewTask() {
         e.preventDefault();
         try {
             // Crear y guardar la tarea dentro del proyecto especificado
-            if (nombreTarea || urlTarea || files.length > 0) { // Incluye la URL en la condición
-                const taskId = Date.now().toString(); // Genera un ID único para la tarea
-                const tareaRef = doc(collection(db, `proyectos/${projectId}/tasks`), taskId); // Usa taskId para crear un nuevo documento
+            if (nombreTarea || urlTarea || files.length > 0) {
+                const taskId = Date.now().toString();
+                const tareaRef = doc(collection(db, `proyectos/${projectId}/tasks`), taskId);
                 const tareaData = {
                     nombreTarea,
-                    urlTarea,  // Incluye la URL en los datos de la tarea
+                    urlTarea,
+                    categorias: selectedCategorias,
                     fechaCreacion: new Date().toISOString(),
                     files
                 };
@@ -73,7 +99,8 @@ function NewTask() {
 
             // Limpiar los estados después de guardar
             setNombreTarea('');
-            setUrlTarea(''); // Limpiar el estado de la URL
+            setUrlTarea('');
+            setSelectedCategorias([]);
             setFiles([]);
 
             alert("Tarea guardada correctamente!");
@@ -124,7 +151,22 @@ function NewTask() {
                         />
                     </Form.Group>
 
-                    {/* Nuevo campo para la URL de la tarea */}
+                    <Form.Group controlId="formBasicCategoriaTareas">
+                        <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Categoría de la Tarea</Form.Label>
+                        <DropdownButton id="dropdown-basic-button" title="Selecciona las categorías" variant="outline-secondary">
+                            {categorias.map((categoria) => (
+                                <Dropdown.Item key={categoria} as="button">
+                                    <Form.Check
+                                        type="checkbox"
+                                        label={categoria}
+                                        checked={selectedCategorias.includes(categoria)}
+                                        onChange={() => handleCategoriaChange(categoria)}
+                                    />
+                                </Dropdown.Item>
+                            ))}
+                        </DropdownButton>
+                    </Form.Group>
+
                     <Form.Group controlId="formBasicUrlTarea">
                         <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>URL de la Tarea</Form.Label>
                         <Form.Control

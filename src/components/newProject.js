@@ -4,6 +4,8 @@ import Sidebar from "./sidebar";
 import Container from "react-bootstrap/Container";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
+import Dropdown from 'react-bootstrap/Dropdown';
+import DropdownButton from 'react-bootstrap/DropdownButton';
 import { MdSave } from "react-icons/md";
 import { db, storage } from "./firebase"; 
 import { doc, setDoc, collection } from "firebase/firestore";
@@ -13,10 +15,23 @@ function NewProject() {
     const [nombreProyecto, setNombreProyecto] = useState('');
     const [descripcionProyecto, setDescripcionProyecto] = useState('');
     const [nombreTarea, setNombreTarea] = useState('');
-    const [urlTarea, setUrlTarea] = useState('');  // Nuevo estado para la URL
+    const [urlTarea, setUrlTarea] = useState('');  
     const [files, setFiles] = useState([]);
     const [uploadStatus, setUploadStatus] = useState({});
+    const [selectedCategorias, setSelectedCategorias] = useState([]);
     const navigate = useNavigate();
+
+    const categorias = [
+        "Página de Inicio",
+        "Orientación de Tareas",
+        "Navegabilidad",
+        "Formularios",
+        "Confianza y Credibilidad",
+        "Calidad del Contenido",
+        "Diagramación y Diseño",
+        "Sección de Búsquedas",
+        "Sección de Reconocimiento de Errores y Retroalimentación"
+    ];
 
     const handleNombreProyectoChange = (e) => {
         setNombreProyecto(e.target.value);
@@ -31,7 +46,17 @@ function NewProject() {
     };
 
     const handleUrlTareaChange = (e) => {
-        setUrlTarea(e.target.value);  // Actualiza el estado de la URL
+        setUrlTarea(e.target.value);  
+    };
+
+    const handleCategoriaChange = (categoria) => {
+        setSelectedCategorias(prevSelected => {
+            if (prevSelected.includes(categoria)) {
+                return prevSelected.filter(c => c !== categoria);
+            } else {
+                return [...prevSelected, categoria];
+            }
+        });
     };
 
     const handleFileUpload = async (file) => {
@@ -67,7 +92,7 @@ function NewProject() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Crear y guardar el proyecto primero
+            // Crear y guardar el proyecto
             const proyectoRef = doc(collection(db, "proyectos"));
             const proyectoData = {
                 nombreProyecto,
@@ -81,7 +106,8 @@ function NewProject() {
                 const tareaRef = doc(collection(proyectoRef, "tasks"));
                 const tareaData = {
                     nombreTarea,
-                    urlTarea,  // Incluye la URL en los datos de la tarea
+                    urlTarea,
+                    categorias: selectedCategorias,
                     fechaCreacion: new Date().toISOString(),
                     files
                 };
@@ -92,7 +118,8 @@ function NewProject() {
             setNombreProyecto('');
             setDescripcionProyecto('');
             setNombreTarea('');
-            setUrlTarea('');  // Limpiar el estado de la URL
+            setUrlTarea(''); 
+            setSelectedCategorias([]);
             setFiles([]);
 
             alert("Proyecto y tarea guardados correctamente!");
@@ -164,8 +191,23 @@ function NewProject() {
                                 onChange={handleNombreTareaChange}
                             />
                         </Form.Group>
+                        
+                        <Form.Group controlId="formBasicCategoriaTareas">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Categoría de la Tarea</Form.Label>
+                            <DropdownButton id="dropdown-basic-button" title="Selecciona las categorías" variant="outline-secondary">
+                                {categorias.map((categoria) => (
+                                    <Dropdown.Item key={categoria} as="button">
+                                        <Form.Check
+                                            type="checkbox"
+                                            label={categoria}
+                                            checked={selectedCategorias.includes(categoria)}
+                                            onChange={() => handleCategoriaChange(categoria)}
+                                        />
+                                    </Dropdown.Item>
+                                ))}
+                            </DropdownButton>
+                        </Form.Group>
 
-                        {/* Nuevo campo para la URL de la tarea */}
                         <Form.Group controlId="formBasicUrlTarea">
                             <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>URL de la Tarea</Form.Label>
                             <Form.Control
