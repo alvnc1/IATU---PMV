@@ -21,25 +21,6 @@ function ProjectPage() {
   const [projectName, setProjectName] = useState(''); 
   const navigate = useNavigate();
 
-  // URL de API en Replit
-  const apiUrl = "https://bdea8115-f32a-4052-bb13-29c64eb22254-00-6nzhxgcrn555.worf.replit.dev/analizar_imagenes";
-
-  // Función para llamar a la API
-  function analizarImagenes() {
-      fetch(apiUrl, {
-          method: 'POST'
-      })
-      .then(response => response.json())
-      .then(data => {
-          console.log('Resultado:', data);
-          alert("Análisis de imágenes completado.");
-      })
-      .catch(error => {
-          console.error('Error:', error);
-          alert("Error al analizar las imágenes.");
-      });
-  }
-
   const getProjectDetails = async () => {
     try {
       const projectDoc = await getDoc(doc(db, 'proyectos', id));
@@ -92,6 +73,27 @@ function ProjectPage() {
     navigate(`/newTask/${id}`);
   };
 
+  const handlePlayTask = (task) => {
+    const videoUrl = task.files.find(file => file.url).url;
+
+    fetch('http://localhost:3001/run-python', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ videoUrl })
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Respuesta del servidor:', data);
+      alert('Análisis de video completado');
+    })
+    .catch(error => {
+      console.error('Error al ejecutar el script de Python:', error);
+      alert('Error al analizar el video');
+    });
+  };
+
   useEffect(() => {
     getProjectDetails(); 
     getTasks();
@@ -136,7 +138,7 @@ function ProjectPage() {
                     <div className="action-buttons">
                       <Button 
                         variant="success" 
-                        onClick={analizarImagenes} // Llama a la función analizarImagenes al hacer clic en el botón "Play"
+                        onClick={() => handlePlayTask(task)}  
                         className="play-button"
                       >
                         <MdPlayArrow size={20} />
