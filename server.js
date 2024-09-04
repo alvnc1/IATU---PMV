@@ -1,7 +1,13 @@
 const express = require('express');
+const cors = require('cors'); // Importa el paquete CORS
 const { spawn } = require('child_process');
 const app = express();
 const port = 3001;
+
+// Configurar CORS para permitir solicitudes desde http://localhost:3000
+app.use(cors({
+  origin: 'http://localhost:3000'  // Aquí defines qué origen está permitido
+}));
 
 app.use(express.json());
 
@@ -12,7 +18,7 @@ app.post('/run-python', (req, res) => {
         return res.status(400).json({ error: 'Video URL is required' });
     }
 
-    const pythonProcess = spawn('python', ['../frameCapture.py', videoUrl]);
+    const pythonProcess = spawn('python', ['frameCapture.py', videoUrl]);
 
     pythonProcess.stdout.on('data', (data) => {
         console.log(`stdout: ${data}`);

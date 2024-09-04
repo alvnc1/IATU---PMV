@@ -35,16 +35,6 @@ for i, scene in enumerate(scene_list):
     start_frame, end_frame = scene[0].get_frames(), scene[1].get_frames()
     timestamp = scene[0].get_seconds()
 
-    # Mover el puntero del video al primer fotograma de la escena detectada
-    cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
-
-    # Leer el fotograma en el momento del cambio de escena
-    ret, frame = cap.read()
-    if ret:
-        filename = os.path.join(output_dir, f"Escena_{i + 1}_{int(timestamp)}s.png")
-        cv2.imwrite(filename, frame)
-        print(f"Guardado {filename}")
-
     # Calcular el número de fotogramas a avanzar para capturar el fotograma 1.5 segundos después
     frames_to_advance = int(fps * 1.5)
     new_frame_position = start_frame + frames_to_advance

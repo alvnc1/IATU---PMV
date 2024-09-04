@@ -89,7 +89,6 @@ function ProjectPage() {
       alert('Análisis de video completado');
     })
     .catch(error => {
-      console.error('Error al ejecutar el script de Python:', error);
       alert('Error al analizar el video');
     });
   };
