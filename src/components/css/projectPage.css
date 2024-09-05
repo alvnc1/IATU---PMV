@@ -133,7 +133,7 @@
 }
 
 .progress-bar {
-  background-color: #333333; /* Color de relleno */
+  background-color: #000000; /* Color de relleno */
   height: 100%;
   width: 0%; /* Comienza en 0 y crecerá */
   border-radius: 40px; /* Redondeado del relleno para coincidir con el contenedor */

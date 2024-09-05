@@ -80,15 +80,27 @@ function ProjectPage() {
     navigate(`/newTask/${id}`);
   };
 
+  // Función para descargar el PDF
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = process.env.PUBLIC_URL + '/informe.pdf';  // Ruta al PDF en el directorio 'public'
+    link.setAttribute('download', 'informe.pdf');  // Nombre con el que se descargará
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+  
   const handlePlayTask = (taskId) => {
     setIsLoading(true);
 
     const videoUrl = taskId.files.find(file => file.url).url;
     const urlTarea = taskId.urlTarea;
     const categorias = taskId.categorias;
+    const nameTask = taskId.nombreTarea;
     console.log(videoUrl);
     console.log(urlTarea);
     console.log(categorias);
+    console.log(nameTask);
 
     // Verificar que todos los valores están presentes
     if (!videoUrl || !urlTarea || !categorias) {
@@ -106,7 +118,7 @@ function ProjectPage() {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ videoUrl, urlTarea, categorias })
+      body: JSON.stringify({ videoUrl, urlTarea, categorias , nameTask})
     })
     .then(response => response.json())
     .then(data => {
@@ -136,7 +148,7 @@ function ProjectPage() {
     getProjectDetails(); 
     getTasks();
   }, []);
-
+  
   return (
     <div style={{ display: 'flex' }}>
       <Sidebar />
@@ -149,13 +161,13 @@ function ProjectPage() {
           </Button>
         </div>
 
-        {isLoading && (
+        {/*isLoading && (
           <div className="progress-bar-container">
             <div className="progress-bar">
               <span className="progress-bar-text">Cargando...</span>
             </div>
           </div>
-        )}
+        )*/}
 
         <div style={{ marginTop: '20px' }}>
           <Table striped bordered hover responsive className="rounded-table">
@@ -175,11 +187,12 @@ function ProjectPage() {
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
                   <td>{testStatus[task.id] || 'Pendiente'}</td>
                   <td>
-                    <Button 
-                    variant="outline-primary"
-                    onClick={() => alert('Play Task')}  
-                    className="me-2 pdf-button">PDF
-                    </Button>
+                      <Button
+                        variant="outline-primary"
+                        onClick={handleDownload}
+                        className="me-2 pdf-button">
+                        PDF
+                      </Button>
                   </td>
                   <td>
                     <div className="action-buttons">

@@ -1,7 +1,9 @@
 import cv2
 import os
 import sys
+from flask import jsonify
 from fpdf import FPDF
+from requests import request
 from scenedetect import open_video, SceneManager
 from scenedetect.detectors import ContentDetector
 from IPython.display import display, Image
@@ -25,11 +27,20 @@ from webdriver_manager.chrome import ChromeDriverManager
 from urllib.parse import urlparse
 from collections import defaultdict
 from spellchecker import SpellChecker
+from fpdf import FPDF
+from urllib.parse import urlparse, unquote
 
+# Crea un objeto PDF
 pdf = FPDF()
+
+# Agrega una página
 pdf.add_page()
-pdf.set_font("Arial",size=12)
-pdf.multicell(200,10,txt= "Revisión de Criterios de Usabilidad Web", ln=True,align='C')
+
+# Establece la fuente (tipografía y tamaño)
+pdf.set_font("Arial", size=14)
+
+# Agrega un título
+pdf.cell(200, 10, txt="Revisión de Criterios Usabilidad Web.", ln=True, align='C')
 
 output_folder = "output_images"
 if not os.path.exists(output_folder):
@@ -39,6 +50,7 @@ if not os.path.exists(output_folder):
 video_path = sys.argv[1]
 url = sys.argv[2]
 categorias = sys.argv[3].split(',')
+name = sys.argv[4]
 
 print(video_path)
 print(url)
@@ -89,50 +101,52 @@ for i, scene in enumerate(scene_list):
 cap.release()
 
 
+# Inicializar el cliente HTTP para inferencias
 CLIENT = InferenceHTTPClient(
     api_url="https://detect.roboflow.com",
     api_key="FCbLovxwSDWFYTwaMuQi"
 )
-# Directorio con las imágenes de entrada
-input_dir = "capturas"  # Cambia esta ruta a la ubicación de tu directorio de imágenes
-output_base_dir = "output_evaluated_images"  # Directorio base para guardar los resultados
+
+# Directorio de imágenes de entrada
+input_dir = "capturas"
+output_base_dir = "output_evaluated_images"
 os.makedirs(output_base_dir, exist_ok=True)
 
+# Inicializar el diccionario para las clases
 dic_clases = {}
-@dataclass
-class Elemento:
-  cantidad: int = 0
-  confianza_promedio: float = 0.0
-  cobertura_promedio: float = 0.0
-# Procesar cada imagen en el directorio de entrada
-for image_filename in os.listdir(input_dir):
-    if image_filename.endswith(('.jpg', '.jpeg', '.png')):  # Filtrar solo las imágenes
+
+# Obtener dimensiones de la página
+page_width = pdf.w
+page_height = pdf.h
+
+# Centrar el título horizontal y verticalmente
+pdf.set_xy(0, page_height / 2 - 10)  # Centramos en Y a la mitad de la página
+pdf.set_font("Arial", 'B', 16)
+pdf.cell(page_width, 10, txt="Componentes Encontrados y Elementos a Analizar", ln=True, align="C")
+
+# Procesar cada imagen
+for idx, image_filename in enumerate(os.listdir(input_dir)):
+    if image_filename.endswith(('.jpg', '.jpeg', '.png')):
         image_path = os.path.join(input_dir, image_filename)
 
-        # Realizar la inferencia en la imagen
+        # Realizar la inferencia con los modelos
         result = CLIENT.infer(image_path, model_id="cingoz8/1")
         result_model_2 = CLIENT.infer(image_path, model_id="app-icon/45")
 
-        filtered_results_model_1 = [pred for pred in result['predictions'] if pred['class'] != 'icon']
-        combined_results = filtered_results_model_1 + result_model_2['predictions']
+        # Combinar los resultados de ambos modelos
+        combined_results = result['predictions'] + result_model_2['predictions']
 
-        # Crear un subdirectorio específico para esta imagen en la salida
+        # Crear subdirectorio para la imagen
         image_output_dir = os.path.join(output_base_dir, os.path.splitext(image_filename)[0])
         os.makedirs(image_output_dir, exist_ok=True)
 
-        # Crear subdirectorios para las bounding boxes y los archivos de texto
-        bboxes_dir = os.path.join(image_output_dir, "bboxes")
-        os.makedirs(bboxes_dir, exist_ok=True)
-
-        # Cargar la imagen usando OpenCV
+        # Cargar la imagen original
         image = cv2.imread(image_path)
         original_height, original_width, _ = image.shape
 
-        # Procesar los resultados y guardar cada bounding box como una imagen separada y sus propiedades
+        # Procesar los resultados y dibujar bounding boxes en la imagen original
         for i, prediction in enumerate(combined_results):
-            if prediction['class'] == "icon": #NO SE CONSIDERAN LOS ICONOS PARA ESTE MODELO YA QUE APP-ICON EN MEJOR
-              continue
-            # Extraer las coordenadas y el tamaño de la bounding box
+            # Coordenadas de la bounding box
             x0 = int(prediction['x'] - prediction['width'] / 2)
             y0 = int(prediction['y'] - prediction['height'] / 2)
             x1 = int(prediction['x'] + prediction['width'] / 2)
@@ -141,63 +155,24 @@ for image_filename in os.listdir(input_dir):
             # Dibujar la bounding box en la imagen original
             cv2.rectangle(image, (x0, y0), (x1, y1), color=(0, 255, 0), thickness=2)
 
-            # Poner el label encima de la bounding box
+            # Poner el label (clase y confianza) encima de la bounding box
             label = f"{prediction['class']} ({prediction['confidence']:.2f})"
             cv2.putText(image, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-            # Recortar la región de la bounding box para guardarla como imagen separada
-            cropped_image = image[y0:y1, x0:x1]
-
-            # Generar el nombre de archivo para la imagen recortada
-            output_image_name = f"bbox_{i+1}.jpg"
-            output_image_path = os.path.join(bboxes_dir, output_image_name)
-
-            # Guardar la imagen recortada
-            cv2.imwrite(output_image_path, cropped_image)
-
-            # Obtener propiedades adicionales
-            bbox_width = x1 - x0
-            bbox_height = y1 - y0
-            bbox_area = bbox_width * bbox_height
-            aspect_ratio = bbox_width / bbox_height
-            center_x = (x0 + x1) / 2
-            center_y = (y0 + y1) / 2
-            coverage_percentage = (bbox_area / (original_width * original_height)) * 100
-            gray_image = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
-            average_brightness = gray_image.mean()
-            contrast = gray_image.max() - gray_image.min()
-            std_dev_brightness = gray_image.std()
-            perimeter = 2 * (bbox_width + bbox_height)
-
-            if prediction['class'] not in dic_clases:
-              dic_clases[prediction['class']] = Elemento()
-            elemento = dic_clases[prediction['class']]
-            elemento.cantidad += 1
-            elemento.confianza_promedio = (elemento.confianza_promedio * (elemento.cantidad - 1) + float(prediction['confidence'])) / elemento.cantidad
-            elemento.cobertura_promedio = (elemento.cobertura_promedio * (elemento.cantidad - 1) + coverage_percentage) / elemento.cantidad
-
-            # Guardar las propiedades en un archivo .txt
-            output_txt_path = os.path.join(bboxes_dir, f"bbox_{i+1}.txt")
-            with open(output_txt_path, 'w') as f:
-                f.write(f"Bounding Box {i+1}:\n")
-                f.write(f" - Clase: {prediction['class']}\n")
-                f.write(f" - Confianza: {prediction['confidence']:.2f}\n")
-                f.write(f" - Dimensiones: {bbox_width}x{bbox_height} píxeles\n")
-                f.write(f" - Área de la bounding box: {bbox_area} píxeles cuadrados\n")
-                f.write(f" - Relación de aspecto: {aspect_ratio:.2f}\n")
-                f.write(f" - Centro de la bounding box: ({center_x}, {center_y})\n")
-                f.write(f" - Cobertura en la imagen original: {coverage_percentage:.2f}%\n")
-                f.write(f" - Brillo promedio: {average_brightness:.2f}\n")
-                f.write(f" - Contraste: {contrast}\n")
-                f.write(f" - Desviación estándar del brillo: {std_dev_brightness:.2f}\n")
-                f.write(f" - Perímetro de la bounding box: {perimeter} píxeles\n")
-
-        # Guardar la imagen original con todas las bounding boxes dibujadas en el directorio de salida
+        # Guardar la imagen original con todas las bounding boxes dibujadas
         output_image_path = os.path.join(image_output_dir, os.path.basename(image_path))
         cv2.imwrite(output_image_path, image)
-print("Proceso completado para todas las imágenes.")
 
+        # Añadir la imagen completa con bounding boxes al PDF
+        if idx % 2 == 0:
+            pdf.add_page()  # Añadir nueva página para cada par de imágenes
 
+        # Posicionar la primera o segunda imagen en la página
+        x_pos = 10  # Margen izquierdo
+        y_pos = 10 if idx % 2 == 0 else 150  # Posicionar la imagen: arriba (y=10) o abajo (y=150)
+        pdf.image(output_image_path, x=x_pos, y=y_pos, w=180)  # Ajustar el tamaño según sea necesario
+
+pdf.add_page()
 # Configurar Selenium con Chrome
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -220,16 +195,26 @@ def hdu_uno(url):
 
     # Inicializar un contador de campos de búsqueda válidos
     valid_search_fields_count = 0
+    
+    pdf.ln(10)
+
+    pdf.set_font("Arial", size=11)
+
+    pdf.cell(200, 10, txt="Página de Inicio", align='C')
+
+    pdf.set_font("Arial", size=10)
+
+    # Agrega un título
+    pdf.cell(200, 10, txt="Campos de búsqueda:", ln=True, align='L')
 
     if search_fields:
         for field in search_fields:
             issues = []
-
             # Verificar si el campo de búsqueda tiene atributos de accesibilidad
             aria_label = field.get_attribute('aria-label')
             title_attr = field.get_attribute('title')
             if not (aria_label or title_attr):
-                issues.append("No tiene atributos de accesibilidad ('aria-label' o 'title').")
+                issues.append("No tiene atributos de acceso ('aria-label' o 'title').")
 
             # Verificar visibilidad y tamaño
             if not field.is_displayed() or field.size['width'] <= 100:
@@ -246,14 +231,23 @@ def hdu_uno(url):
                 issues.append("No está ubicado dentro de la cabecera.")
 
             if issues:
-                print(f"Problemas encontrados en un campo de búsqueda ({field.get_attribute('name')} o '{aria_label or title_attr}'): " + " // ".join(issues))
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, f"- Problemas encontrados en un campo de búsqueda ({field.get_attribute('name')}'): " + " // ".join(issues))
             else:
                 valid_search_fields_count += 1
-
+        pdf.set_font("Arial", size=8)
         if valid_search_fields_count > 0:
-            print(f"{valid_search_fields_count} campo(s) de búsqueda válido(s) y bien posicionado(s) detectado(s).")
+            pdf.set_x(15)
+            pdf.multi_cell(0, 8, f"- {valid_search_fields_count} campo(s) de búsqueda válido(s) y bien posicionado(s) detectado(s).")
     else:
-        print("Campo de búsqueda NO detectado.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(0, 8,"- Campo de búsqueda NO detectado.")
+
+    pdf.set_font("Arial", size=10)
+    # Agrega un título
+    pdf.cell(200, 10, txt="Palabras Clave:", ln=True, align='L')
 
     # 2. Verificación de palabras clave en enlaces
     N = 3
@@ -281,13 +275,32 @@ def hdu_uno(url):
                     break
 
     if enlaces_con_palabras_clave:
-        print("Enlaces que contienen palabras clave frecuentes:")
         for detalle in enlaces_con_palabras_clave:
-            print(detalle)
-    else:
-        print(f"No se encontraron enlaces que contengan palabras clave que aparezcan al menos {N} veces.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 8, '- ' + ' '.join(detalle.split()))
 
-    # 3. Verificación de imágenes genéricas (sin requests.get)
+    else:
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(0, 8, f"- No se encontraron enlaces que contengan palabras clave que aparezcan al menos {N} veces.")
+
+    pdf.set_font("Arial", size=10)
+    # Agrega un título
+    pdf.cell(200, 10, txt="Imágenes Genéricas:", ln=True, align='L')
+
+    # Función para extraer el nombre del archivo de una URL
+    def obtener_nombre_archivo(src):
+        # Quitar los parámetros después del '?'
+        parsed_url = urlparse(src)
+        clean_url = parsed_url.path
+        # Decodificar caracteres especiales (%20 por espacios, etc.)
+        decoded_url = unquote(clean_url)
+        # Extraer la última parte de la URL, que normalmente es el nombre del archivo
+        nombre_archivo = decoded_url.split('/')[-1]
+        return nombre_archivo
+
+    # Continuación del código original
     nlp = spacy.load("en_core_web_md")
     palabras_clave_negativas = [
         'clipart', 'generic', 'placeholder', 'dummy', 'image1', 'stock',
@@ -302,14 +315,17 @@ def hdu_uno(url):
         src = img.get_attribute('src').strip().lower()
         problema_detectado = False
 
+        # Obtener solo el nombre del archivo
+        nombre_archivo = obtener_nombre_archivo(src)
+
         # Validar que la imagen tenga texto alternativo significativo
         if not alt_text:
-            mensajes_advertencia.append(f"Imagen sin descripción adecuada. Fuente: {src}")
+            mensajes_advertencia.append(f"- Imagen sin descripción adecuada. Archivo: {nombre_archivo}")
             problema_detectado = True
         else:
             # Verificar si el texto alternativo o el src contienen términos genéricos o problemáticos
             if any(negativa in alt_text for negativa in palabras_clave_negativas) or any(negativa in src for negativa in palabras_clave_negativas):
-                mensajes_advertencia.append(f"Imagen genérica o de baja calidad detectada. Fuente: {src} con descripción '{alt_text}'")
+                mensajes_advertencia.append(f"- Imagen genérica o de baja calidad detectada. Archivo: {nombre_archivo} con descripción '{alt_text}'")
                 problema_detectado = True
 
         # Verificación de dimensiones de imagen usando Selenium
@@ -317,15 +333,15 @@ def hdu_uno(url):
         height = img.size['height']
 
         if width < 50 or height < 50:
-            mensajes_advertencia.append(f"Imagen muy pequeña detectada. Fuente: {src}")
+            mensajes_advertencia.append(f"- Imagen muy pequeña detectada. Archivo: {nombre_archivo}")
             problema_detectado = True
         elif width / height < 0.5 or width / height > 2:
-            mensajes_advertencia.append(f"Imagen con dimensiones inusuales detectada. Fuente: {src}")
+            mensajes_advertencia.append(f"- Imagen con dimensiones inusuales detectada. Archivo: {nombre_archivo}")
             problema_detectado = True
 
         # Verificar si el nombre del archivo de la imagen en el src indica que podría ser genérica
         if re.search(r'\b(?:img|image|placeholder|stock)\b', src):
-            mensajes_advertencia.append(f"Nombre del archivo sugiere que la imagen podría ser genérica. Fuente: {src}")
+            mensajes_advertencia.append(f"- El nombre del archivo sugiere que la imagen podría ser genérica. Archivo: {nombre_archivo}")
             problema_detectado = True
 
         if problema_detectado:
@@ -333,13 +349,22 @@ def hdu_uno(url):
 
     if mensajes_advertencia:
         for mensaje in mensajes_advertencia:
-            print(mensaje)
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, mensaje)
 
         if conteo_errores_imagenes >= 5:
-            print(f"Se encontraron {conteo_errores_imagenes} problemas con las imágenes del sitio.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, f"- Se encontraron {conteo_errores_imagenes} problemas con las imágenes del sitio.")
     else:
-        print("Validación de imágenes completada sin problemas.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 8, "- Validación de imágenes completada sin problemas.")
 
+
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Optimización en buscadores:", ln=True, align='L')
     # 4. Optimización del título para buscadores
     nlp = spacy.load("en_core_web_md")
     title_tag = driver.find_element(By.TAG_NAME, 'title').text
@@ -349,27 +374,33 @@ def hdu_uno(url):
         title_text = title_tag.strip()
 
         if 50 <= len(title_text) <= 60:
-            print("Título con longitud óptima para buscadores:", title_text)
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, "- Título con longitud óptima para buscadores:", title_text)
         elif len(title_text) < 50:
-            mensajes_advertencia.append(f"El título es demasiado corto ({len(title_text)} caracteres): {title_text}")
+            mensajes_advertencia.append(f"- El título es demasiado corto ({len(title_text)} caracteres): {title_text}")
         else:
-            mensajes_advertencia.append(f"El título es demasiado largo ({len(title_text)} caracteres): {title_text}")
+            mensajes_advertencia.append(f"- El título es demasiado largo ({len(title_text)} caracteres): {title_text}")
 
         # Análisis de palabras clave en el título
         page_content = " ".join([p.text for p in driver.find_elements(By.TAG_NAME, 'p')])
         title_similarity = nlp(title_text).similarity(nlp(page_content))
 
         if title_similarity < 0.2:
-            mensajes_advertencia.append(f"El título '{title_text}' puede no ser relevante para el contenido de la página.")
+            mensajes_advertencia.append(f"- El título '{title_text}' puede no ser relevante para el contenido de la página.")
         else:
-            print(f"El título es semánticamente relevante con una similitud de {title_similarity:.2f} con el contenido de la página.")
+            print(f"- El título es semánticamente relevante con una similitud de {title_similarity:.2f} con el contenido de la página.")
     else:
-        mensajes_advertencia.append("Error crítico: No se encontró un título en la página.")
+        mensajes_advertencia.append("- Error crítico: No se encontró un título en la página.")
 
     if mensajes_advertencia:
         for mensaje in mensajes_advertencia:
-            print(mensaje)
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, mensaje)
 
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Información Corporativa:", ln=True, align='L')
     # 5. Información corporativa en la página
     palabras_clave_corporativas = [
         "acerca de", "sobre nosotros", "about", "about us", "empresa", "quiénes somos",
@@ -383,13 +414,19 @@ def hdu_uno(url):
         section_text = section.text.lower()
 
         if any(keyword in section_text for keyword in palabras_clave_corporativas):
-            print("Información corporativa detectada correctamente.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, "- Información corporativa detectada correctamente.")
             corporate_info_detectada = True
             break
 
     if not corporate_info_detectada:
-        print("Información corporativa NO detectada.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 8, "- Información corporativa NO detectada.")
 
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Sencillez de URL:", ln=True, align='L')
     # 6. URL sencilla y fácil de recordar
     url_parts = urlparse(url)
     path = url_parts.path.strip('/')
@@ -401,92 +438,130 @@ def hdu_uno(url):
 
     if query:
         url_simple = False
-        mensajes_advertencia.append(f"URL compleja: contiene parámetros en la cadena de consulta: '{query}'")
+        mensajes_advertencia.append(f"- URL compleja: contiene parámetros en la cadena de consulta: '{query}'")
     if len(url) > 100:
         url_simple = False
-        mensajes_advertencia.append(f"URL demasiado larga: {len(url)} caracteres")
+        mensajes_advertencia.append(f"- URL demasiado larga: {len(url)} caracteres")
     if len(path_segments) > 2:
         url_simple = False
-        mensajes_advertencia.append(f"URL con múltiples subdirectorios: {'/'.join(path_segments)}")
+        mensajes_advertencia.append(f"- URL con múltiples subdirectorios: {'/'.join(path_segments)}")
 
     if url_simple:
-        print("La URL es sencilla y fácil de recordar:", url)
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 8, "- La URL es sencilla y fácil de recordar:", url)
     else:
         for mensaje in mensajes_advertencia:
-            print(mensaje)
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, mensaje)
+
+    driver.quit()
+    
+
+def obtener_atributo_safe(elemento, atributo, max_intentos=3):
+    intento = 0
+    while intento < max_intentos:
+        try:
+            return elemento.get_attribute(atributo)
+        except StaleElementReferenceException:
+            intento += 1
+            time.sleep(0.5)  # Esperar brevemente antes de intentar de nuevo
+    return None  # Si después de varios intentos no se puede obtener, devuelve None
 
 def hdu_dos(url):
     driver.get(url)
-    
-    pdf.multicell(200,10,txt= "Orientación de Tareas", ln=True, align='C')
-    
+    pdf.ln(10)
+    pdf.set_font("Arial", size=11)
+    pdf.cell(200, 10, txt="Orientación de Tareas", ln=True, align='C')
+
     # --- Análisis de Recursos ---
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Recuento y análisis de recursos cargados:", ln=True, align='L')
 
     # Recuento y análisis de scripts
     scripts = driver.find_elements(By.TAG_NAME, 'script')
-    large_scripts = [script for script in scripts if script.get_attribute('src') and len(script.get_attribute('src')) > 0]
+    large_scripts = [script for script in scripts if obtener_atributo_safe(script, 'src') and len(obtener_atributo_safe(script, 'src')) > 0]
     
-    pdf.multicell(200,10, txt= f"Se encontró {len(scripts)} script{'s' if len(scripts) != 1 else ''} en la página.", ln=True, align='C')
-    #print(f"Se encontró {len(scripts)} script{'s' if len(scripts) != 1 else ''} en la página.")
+    pdf.set_font("Arial", size=8)
+    pdf.set_x(15)
+    pdf.multi_cell(200, 10, txt=f"- Se encontró {len(scripts)} script{'s' if len(scripts) != 1 else ''} en la página.")
+
     if large_scripts:
-        pdf.multicell(200,10, txt=f"Script{'s' if len(large_scripts) != 1 else ''} con fuente externa: {len(large_scripts)}", ln=True, align='C')
-        #print(f"Script{'s' if len(large_scripts) != 1 else ''} con fuente externa: {len(large_scripts)}")
+        pdf.set_x(15)
+        pdf.multi_cell(200, 10, txt=f"- Script{'s' if len(large_scripts) != 1 else ''} con fuente externa: {len(large_scripts)}")
 
     # Recuento y análisis de videos
     videos = driver.find_elements(By.TAG_NAME, 'video')
-    pdf.multicell(200,10,txt= f"Se encontró {len(videos)} video{'s' if len(videos) != 1 else ''} en la página.", ln=True, align='C')
-    #print(f"Se encontró {len(videos)} video{'s' if len(videos) != 1 else ''} en la página.")
+    pdf.set_x(15)
+    pdf.multi_cell(200, 10, txt=f"- Se encontró {len(videos)} video{'s' if len(videos) != 1 else ''} en la página.")
+    
     for video in videos:
-        video_size = int(video.get_attribute('size')) if video.get_attribute('size') else 0
+        video_size = int(obtener_atributo_safe(video, 'size')) if obtener_atributo_safe(video, 'size') else 0
         if video_size > 5000000:  # Umbral ajustable, por ejemplo, 5MB
-            pdf.multicell(200,10,txt= f"Advertencia: Video grande detectado con tamaño {video_size / 1000000:.2f}MB", ln=True, align='C')
-            #print(f"Advertencia: Video grande detectado con tamaño {video_size / 1000000:.2f}MB")
+            pdf.set_x(15)
+            pdf.multi_cell(200, 10, txt=f"- Advertencia: Video grande detectado con tamaño {video_size / 1000000:.2f}MB")
 
     # Recuento y análisis de imágenes
     imagenes = driver.find_elements(By.TAG_NAME, 'img')
-    pdf.multicell(200,10,txt= f"Se encontró {len(imagenes)} imagen{'es' if len(imagenes) != 1 else ''} en la página.", ln=True, align='C')
-    #print(f"Se encontró {len(imagenes)} imagen{'es' if len(imagenes) != 1 else ''} en la página.")
+    pdf.set_x(15)
+    pdf.multi_cell(200, 10, txt=f"- Se encontró {len(imagenes)} imagen{'es' if len(imagenes) != 1 else ''} en la página.")
+    
     for img in imagenes:
         width = img.size['width']
         height = img.size['height']
         if width < 50 or height < 50:
-            pdf.multicell(200,10,txt= f"Advertencia: Imagen muy pequeña detectada (dimensiones: {width}x{height}px)", ln=True, align='C')
-            #print(f"Advertencia: Imagen muy pequeña detectada (dimensiones: {width}x{height}px)")
+            pdf.set_x(15)
+            pdf.multi_cell(200, 10, txt=f"- Advertencia: Imagen muy pequeña detectada (dimensiones: {width}x{height}px)")
         elif width / height < 0.5 or width / height > 2:
-            pdf.multicell(200,10,txt= f"Advertencia: Imagen con dimensiones inusuales detectada (dimensiones: {width}x{height}px)", ln=True, align='C')
-            #print(f"Advertencia: Imagen con dimensiones inusuales detectada (dimensiones: {width}x{height}px)")
+            pdf.set_x(15)
+            pdf.multi_cell(200, 10, txt=f"- Advertencia: Imagen con dimensiones inusuales detectada (dimensiones: {width}x{height}px)")
 
     # Recuento y análisis de archivos de audio
     audios = driver.find_elements(By.TAG_NAME, 'audio')
-    print(f"Se encontró {len(audios)} archivo{'s de audio' if len(audios) != 1 else ' de audio'} en la página.")
+    pdf.set_x(15)
+    pdf.multi_cell(200, 10, txt=f"- Se encontró {len(audios)} archivo{'s de audio' if len(audios) != 1 else ' de audio'} en la página.")
 
-    # Recuento y análisis de applets (poco comunes pero posibles)
+    # Recuento y análisis de applets
     applets = driver.find_elements(By.TAG_NAME, 'applet')
-    print(f"Se encontró {len(applets)} applet{'s' if len(applets) != 1 else ''} en la página.")
+    pdf.set_x(15)
+    pdf.multi_cell(200, 10, txt=f"- Se encontró {len(applets)} applet{'s' if len(applets) != 1 else ''} en la página.")
     if applets:
-        print("Advertencia: Uso de applets detectado. Esto podría afectar la compatibilidad y rendimiento de la página.")
+        pdf.set_x(15)
+        pdf.multi_cell(200, 10, txt="- Advertencia: Uso de applets detectado. Esto podría afectar la compatibilidad y rendimiento de la página.")
 
     # Evaluación de la cantidad total de recursos
     total_resources = len(scripts) + len(videos) + len(imagenes) + len(audios) + len(applets)
-    if total_resources > 50:  # Umbral ajustable para cantidad total de recursos
-        print(f"Advertencia: Se cargaron {total_resources} recursos en la página, lo que puede afectar el rendimiento.")
+    if total_resources > 50:
+        pdf.set_x(15)
+        pdf.multi_cell(200, 10, txt=f"- Advertencia: Se cargaron {total_resources} recursos en la página, lo que puede afectar el rendimiento.")
     else:
-        print(f"Cantidad total de recursos cargados en la página: {total_resources}")
+        pdf.set_x(15)
+        pdf.multi_cell(200, 10, txt=f"- Cantidad total de recursos cargados en la página: {total_resources}")
 
     # --- Detección de Barreras Innecesarias ---
-
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Detección de Barreras Innecesarias:", ln=True, align='L')
+    pdf.set_font("Arial", size=8)
     # 1. Detección de formularios de registro
     try:
         registration_forms = driver.find_elements(By.CSS_SELECTOR, 'form[action*="register"], form[action*="signup"], form[action*="subscribe"]')
         if registration_forms:
             for form in registration_forms:
                 if form.is_displayed():
-                    print(f"Formulario de registro detectado: {form.get_attribute('action')}")
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10,txt= f"- Formulario de registro detectado: {form.get_attribute('action')}")
+                    #print(f"Formulario de registro detectado: {form.get_attribute('action')}")
                 else:
-                    print(f"Formulario de registro no visible: {form.get_attribute('action')}")
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10,txt= f"- Formulario de registro no visible: {form.get_attribute('action')}")
+                    #print(f"Formulario de registro no visible: {form.get_attribute('action')}")
         else:
-            print("No se encontraron formularios de registro visibles en la página.")
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= "- No se encontraron formularios de registro visibles en la página.")
+            #print("No se encontraron formularios de registro visibles en la página.")
     except NoSuchElementException:
+        #pdf.multi_cell(200,10,txt= "Error al buscar formularios de registro.")
         print("Error al buscar formularios de registro.")
 
     # 2. Detección de ventanas modales de suscripción
@@ -497,13 +572,20 @@ def hdu_dos(url):
             if modal.is_displayed():
                 modal_text = modal.text.lower()
                 if any(keyword in modal_text for keyword in ['registrarse', 'suscribirse', 'register', 'sign up', 'subscribe']):
-                    print(f"Ventana modal de suscripción detectada con contenido relevante: {modal_text[:100]}...")
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10,txt= f"- Ventana modal de suscripción detectada con contenido relevante: {modal_text[:100]}...")
+                    #print(f"Ventana modal de suscripción detectada con contenido relevante: {modal_text[:100]}...")
                     modal_detected = True
                 else:
-                    print(f"Ventana modal detectada, pero no parece relacionada con el registro o suscripción: {modal_text[:100]}...")
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10,txt= f"- Ventana modal detectada, pero no parece relacionada con el registro o suscripción: {modal_text[:100]}...")
+                    #print(f"Ventana modal detectada, pero no parece relacionada con el registro o suscripción: {modal_text[:100]}...")
         if not modal_detected:
-            print("No se encontraron ventanas modales de suscripción que bloqueen el acceso al contenido.")
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= "- No se encontraron ventanas modales de suscripción que bloqueen el acceso al contenido.")
+            #print("No se encontraron ventanas modales de suscripción que bloqueen el acceso al contenido.")
     except NoSuchElementException:
+        #pdf.multi_cell(200,10,txt= "Error al buscar ventanas modales de suscripción.")
         print("Error al buscar ventanas modales de suscripción.")
 
     # 3. Verificación de posibilidad de cierre de modales
@@ -511,18 +593,26 @@ def hdu_dos(url):
         close_buttons = driver.find_elements(By.CSS_SELECTOR, '[class*="close"], button[class*="close"], button[class*="cancel"]')
         for button in close_buttons:
             if button.is_displayed() and button.is_enabled():
-                print("Botón de cierre de ventana modal detectado y habilitado.")
+                pdf.set_x(15)
+                pdf.multi_cell(200,10,txt= "- Botón de cierre de ventana modal detectado y habilitado.")
+                #print("Botón de cierre de ventana modal detectado y habilitado.")
             else:
-                print("Advertencia: Botón de cierre de ventana modal no disponible o no visible.")
+                pdf.set_x(15)
+                pdf.multi_cell(200,10,txt= "- Advertencia: Botón de cierre de ventana modal no disponible o no visible.")
+                #print("Advertencia: Botón de cierre de ventana modal no disponible o no visible.")
     except NoSuchElementException:
         print("Error al buscar botones de cierre para ventanas modales.")
 
     # --- Cantidad de Ventanas/Pestañas Abiertas ---
-
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Cantidad de pestañas durante navegación:", ln=True, align='L')
+    pdf.set_font("Arial", size=8)
     # Obtener el número inicial de ventanas/pestañas abiertas
     initial_window_handles = driver.window_handles
     initial_window_count = len(initial_window_handles)
-    print(f"Cantidad inicial de ventanas/pestañas abiertas: {initial_window_count}")
+    pdf.set_x(15)
+    pdf.multi_cell(200,10,txt= f"- Cantidad inicial de ventanas/pestañas abiertas: {initial_window_count}")
+    #print(f"Cantidad inicial de ventanas/pestañas abiertas: {initial_window_count}")
 
     # Inicializar current_window_count
     current_window_count = initial_window_count
@@ -531,7 +621,9 @@ def hdu_dos(url):
     try:
         potential_link = driver.find_element(By.CSS_SELECTOR, 'a[target="_blank"]')
         potential_link_text = potential_link.text or potential_link.get_attribute('href')
-        print(f"Se hizo clic en el enlace que potencialmente abre nueva pestaña: '{potential_link_text}'")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= f"- Se hizo clic en el enlace que potencialmente abre nueva pestaña: '{potential_link_text}'")
+        #print(f"Se hizo clic en el enlace que potencialmente abre nueva pestaña: '{potential_link_text}'")
 
         potential_link.click()
 
@@ -543,28 +635,44 @@ def hdu_dos(url):
         current_window_count = len(current_window_handles)
 
         if current_window_count > initial_window_count:
-            print(f"Se abrió(eron) {current_window_count - initial_window_count} nueva(s) ventana(s)/pestaña(s) al hacer clic en el enlace: '{potential_link_text}'.")
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Se abrieron {current_window_count - initial_window_count} nueva(s) ventana(s)/pestaña(s) al hacer clic en el enlace: '{potential_link_text}'.")
+            #print(f"Se abrió(eron) {current_window_count - initial_window_count} nueva(s) ventana(s)/pestaña(s) al hacer clic en el enlace: '{potential_link_text}'.")
         else:
-            print(f"No se abrió ninguna nueva ventana/pestaña al hacer clic en el enlace: '{potential_link_text}'.")
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- No se abrió ninguna nueva ventana/pestaña al hacer clic en el enlace: '{potential_link_text}'.")
+            #print(f"No se abrió ninguna nueva ventana/pestaña al hacer clic en el enlace: '{potential_link_text}'.")
     except NoSuchElementException:
-        print("No se encontró un enlace que abra una nueva ventana o pestaña.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,"- No se encontró un enlace que abra una nueva ventana o pestaña.")
 
     # Evaluación final de ventanas abiertas
     if current_window_count > initial_window_count:
-        print(f"Advertencia: Se abrió(eron) {current_window_count - initial_window_count} nueva(s) ventana(s)/pestaña(s), lo que podría afectar la experiencia del usuario.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= f"- Advertencia: Se abrieron {current_window_count - initial_window_count} nueva(s) ventana(s)/pestaña(s), lo que podría afectar la experiencia del usuario.")
+        #print(f"Advertencia: Se abrió(eron) {current_window_count - initial_window_count} nueva(s) ventana(s)/pestaña(s), lo que podría afectar la experiencia del usuario.")
     else:
-        print("Navegación sin apertura de ventanas/pestañas adicionales innecesarias.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, "- Navegación sin apertura de ventanas/pestañas adicionales innecesarias.")
 
     # --- Longitud y Cantidad de Clics ---
-
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Longitud de la página para tareas:", ln=True, align='L')
+    pdf.set_font("Arial", size=8)
     # 1. Medición de la longitud de la página
     page_height = driver.execute_script("return document.body.scrollHeight")
-    print(f"Altura total de la página: {page_height} píxeles")
+    pdf.set_x(15)
+    pdf.multi_cell(200,10,txt= f"- Altura total de la página: {page_height} píxeles")
+    #print(f"Altura total de la página: {page_height} píxeles")
 
     if page_height > 3000:
-        print("Advertencia: La página es demasiado larga, lo que podría afectar la navegación eficiente.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- Advertencia: La página es demasiado larga, lo que podría afectar la navegación eficiente.")
+        #print("Advertencia: La página es demasiado larga, lo que podría afectar la navegación eficiente.")
     else:
-        print("Longitud de la página dentro del rango aceptable.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,"- Longitud de la página dentro del rango aceptable.")
+
 
     # 2. Análisis de la cantidad de clics para completar una tarea clave (sección corporativa/contacto)
     palabras_clave_corporativas = [
@@ -582,7 +690,9 @@ def hdu_dos(url):
                 enlace_corporativo.click()
                 click_count += 1
                 seccion_encontrada = True
-                print(f"Sección '{palabra}' encontrada en un enlace y accedida con {click_count} clic(s).")
+                pdf.set_x(15)
+                pdf.multi_cell(200,10,txt= f"- Sección '{palabra}' encontrada en un enlace y accedida con {click_count} clic(s).")
+                #print(f"Sección '{palabra}' encontrada en un enlace y accedida con {click_count} clic(s).")
                 break
         except NoSuchElementException:
             continue
@@ -594,7 +704,9 @@ def hdu_dos(url):
                 for seccion in secciones:
                     if seccion.is_displayed():
                         seccion_encontrada = True
-                        print(f"Sección '{palabra}' encontrada en un elemento no enlazado.")
+                        pdf.set_x(15)
+                        pdf.multi_cell(200,10,txt= f"- Sección '{palabra}' encontrada en un elemento no enlazado.")
+                        #print(f"Sección '{palabra}' encontrada en un elemento no enlazado.")
                         break
                 if seccion_encontrada:
                     break
@@ -603,13 +715,19 @@ def hdu_dos(url):
 
     if seccion_encontrada and click_count > 0:
         if click_count > 3:
-            print(f"Advertencia: Se requieren {click_count} clics para acceder a la sección corporativa.")
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Advertencia: Se requieren {click_count} clics para acceder a la sección corporativa.")
+            #print(f"Advertencia: Se requieren {click_count} clics para acceder a la sección corporativa.")
         else:
-            print(f"La sección corporativa fue accesible con {click_count} clic(s), dentro del rango aceptable.")
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- La sección corporativa fue accesible con {click_count} clic(s), dentro del rango aceptable.")
+            #print(f"La sección corporativa fue accesible con {click_count} clic(s), dentro del rango aceptable.")
     elif seccion_encontrada and click_count == 0:
-        print("Sección corporativa encontrada sin necesidad de clics adicionales.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,"- Sección corporativa encontrada sin necesidad de clics adicionales.")
     else:
-        print("No se encontró ninguna sección corporativa utilizando las palabras clave especificadas.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,"- No se encontró ninguna sección corporativa utilizando las palabras clave especificadas.")
 
     # 3. Verificación de la profundidad de navegación
     menus = driver.find_elements(By.CSS_SELECTOR, 'nav, ul, ol')
@@ -621,16 +739,24 @@ def hdu_dos(url):
 
     if depth_counts:
         max_depth = max(depth_counts)
-        print(f"Profundidad máxima de navegación detectada: {max_depth} niveles.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= f"- Profundidad máxima de navegación detectada: {max_depth} niveles.")
+        #print(f"Profundidad máxima de navegación detectada: {max_depth} niveles.")
         if max_depth > 2:
-            print("Advertencia: La estructura de navegación es demasiado profunda.")
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= "- Advertencia: La estructura de navegación es demasiado profunda.")
+            #print("Advertencia: La estructura de navegación es demasiado profunda.")
         else:
-            print("La estructura de navegación es aceptablemente profunda.")
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,"- La estructura de navegación es aceptablemente profunda.")
     else:
-        print("No se detectaron menús con subniveles.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,"- No se detectaron menús con subniveles.")
 
     # --- Formularios y Un-Click ---
-
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Acciones Rápidas:", ln=True, align='L')
+    pdf.set_font("Arial", size=8)
     # Búsqueda de formularios y verificación de autocompletar
     formularios = driver.find_elements(By.TAG_NAME, 'form')
     formularios_con_autocompletar = []
@@ -650,25 +776,38 @@ def hdu_dos(url):
                 break
 
     if formularios_con_autocompletar:
-        print(f"Se encontraron {len(formularios_con_autocompletar)} formularios con autocompletar habilitado.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= f"- Se encontraron {len(formularios_con_autocompletar)} formulario(s) con autocompletar habilitado.")
+        #print(f"Se encontraron {len(formularios_con_autocompletar)} formularios con autocompletar habilitado.")
     else:
-        print("No se encontraron formularios con autocompletar habilitado.")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,"- No se encontraron formularios con autocompletar habilitado.")
 
     if formularios_con_un_click:
-        print(f"Se encontraron {len(formularios_con_un_click)} formularios con botones de acción rápida (un-click).")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= f"- Se encontraron {len(formularios_con_un_click)} formulario(s) con botones de acción rápida (un-click).")
+        #print(f"Se encontraron {len(formularios_con_un_click)} formularios con botones de acción rápida (un-click).")
     else:
-        print("No se encontraron formularios con botones de acción rápida (un-click).")
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,"- No se encontraron formularios con botones de acción rápida (un-click).")
 
     # Evaluación final
     if not formularios_con_autocompletar and not formularios_con_un_click:
-        print("No se encontraron formularios con autocompletar ni con botones de acción rápida, podría considerarse una oportunidad de mejora en la usabilidad.")
-
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- No se encontraron formularios con autocompletar ni con botones de acción rápida, podría considerarse una oportunidad de mejora en la usabilidad.")
+        #print("No se encontraron formularios con autocompletar ni con botones de acción rápida, podría considerarse una oportunidad de mejora en la usabilidad.")
     driver.quit()
-
 
 def hdu_tres(url):
     # Navegar a la URL
     driver.get(url)
+
+    pdf.ln(10)
+
+    pdf.set_font("Arial", size=11)
+
+    pdf.cell(200, 10, txt="Navegabilidad", align='C')
+
 
     # --- Verificación de menús de navegación y enlaces visibles ---
     selectors = ['nav', 'ul', 'ol', '.menu', '.navbar', '.navigation']
@@ -678,19 +817,31 @@ def hdu_tres(url):
 
     # Evaluación de la existencia de menús de navegación
     if navigation_menus:
-        print(f"Se encontraron {len(navigation_menus)} menús de navegación.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 8, txt= f"- Se encontraron {len(navigation_menus)} menús de navegación.")
+        #print(f"Se encontraron {len(navigation_menus)} menús de navegación.")
         for index, menu in enumerate(navigation_menus, start=1):
             items = menu.find_elements(By.TAG_NAME, 'li')
             visible_items = [item for item in items if item.is_displayed()]
-            print(f"Menú {index} con {len(visible_items)} elementos visibles.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, txt= f"- Menú {index} con {len(visible_items)} elementos visibles.")
+            #print(f"Menú {index} con {len(visible_items)} elementos visibles.")
 
             # Verificación de enlaces dentro del menú
             links = menu.find_elements(By.TAG_NAME, 'a')
             visible_links = [link for link in links if link.is_displayed()]
             if visible_links:
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, txt= f"- Menú {index} con {len(visible_items)} elementos visibles.")
                 print(f"Menú {index} tiene {len(visible_links)} enlaces visibles y clickeables.")
             else:
-                print(f"Advertencia: Menú {index} no tiene enlaces visibles y clickeables.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, f"- Advertencia: Menú {index} no tiene enlaces visibles y clickeables.")
+                #print(f"Advertencia: Menú {index} no tiene enlaces visibles y clickeables.")
     else:
         print("No se encontraron menús de navegación.")
 
@@ -700,7 +851,10 @@ def hdu_tres(url):
         if home_link.is_displayed():
             print("Enlace para regresar a la página de inicio detectado y visible.")
         else:
-            print("Advertencia: El enlace para regresar a la página de inicio no es visible.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, "- Advertencia: El enlace para regresar a la página de inicio no es visible.")
+            #print("Advertencia: El enlace para regresar a la página de inicio no es visible.")
     except NoSuchElementException:
         print("No se encontró un enlace para regresar a la página de inicio.")
 
@@ -720,9 +874,15 @@ def hdu_tres(url):
             max_depth = max(max_depth, depth)
 
     if total_items > 0:
-        print(f"Se encontraron un total de {total_items} elementos en los menús de navegación.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 8, f"- Se encontraron un total de {total_items} elementos en los menús de navegación.")
+        #print(f"Se encontraron un total de {total_items} elementos en los menús de navegación.")
         if deep_menus_count > 0:
-            print(f"Se encontraron {deep_menus_count} menús de navegación profundos con una profundidad máxima de {max_depth} niveles.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, f" - Se encontraron {deep_menus_count} menús de navegación profundos con una profundidad máxima de {max_depth} niveles.")
+            #print(f"Se encontraron {deep_menus_count} menús de navegación profundos con una profundidad máxima de {max_depth} niveles.")
         else:
             print("Todos los menús de navegación son amplios (sin niveles profundos).")
     else:
@@ -735,13 +895,21 @@ def hdu_tres(url):
     if tabs_at_top:
         clickeable_tabs = [tab for tab in tabs_at_top if tab.is_displayed() and tab.is_enabled()]
         if clickeable_tabs:
-            print(f"Se encontraron {len(clickeable_tabs)} pestañas de navegación en la parte superior, todas clickeables.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, f"- Se encontraron {len(clickeable_tabs)} pestañas de navegación en la parte superior, todas clickeables.")
+            #print(f"Se encontraron {len(clickeable_tabs)} pestañas de navegación en la parte superior, todas clickeables.")
             for index, tab in enumerate(clickeable_tabs, start=1):
-                print(f"Pestaña {index}: Texto='{tab.text}', Posición Y={tab.location['y']}px")
-                screenshot_path = os.path.join(output_folder, f"pestana_{index}_captura.png")
-                tab.screenshot(screenshot_path)
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, f"- Pestaña {index}: Texto='{tab.text}', Posición Y={tab.location['y']}px")
+                #print(f"Pestaña {index}: Texto='{tab.text}', Posición Y={tab.location['y']}px")
+                tab.screenshot(f"pestana_{index}_captura.png")
         else:
-            print("Se encontraron pestañas en la parte superior, pero ninguna es clickeable.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, "- Se encontraron pestañas en la parte superior, pero ninguna es clickeable.")
+            #print("Se encontraron pestañas en la parte superior, pero ninguna es clickeable.")
     else:
         print("No se encontraron pestañas de navegación en la parte superior.")
 
@@ -750,9 +918,11 @@ def hdu_tres(url):
         if container.location['y'] < 200:
             container_tabs = container.find_elements(By.TAG_NAME, 'a')
             if container_tabs:
-                print(f"Contenedor de navegación superior encontrado con {len(container_tabs)} pestañas.")
-                screenshot_path = os.path.join(output_folder, f"contenedor_superior_captura.png")
-                container.screenshot(screenshot_path)
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, f"- Contenedor de navegación superior encontrado con {len(container_tabs)} pestañas.")
+                #print(f"Contenedor de navegación superior encontrado con {len(container_tabs)} pestañas.")
+                container.screenshot(f"contenedor_superior_captura.png")
             else:
                 print(f"Contenedor de navegación superior encontrado, pero sin pestañas clickeables.")
 
@@ -771,15 +941,20 @@ def hdu_tres(url):
     for ruta, links in ruta_links.items():
         if len(links) > 1:
             rutas_con_multiples_enlaces += 1
-            print(f"Ruta '{ruta}' accesible desde {len(links)} enlaces diferentes.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, f"- Ruta '{ruta}' accesible desde {len(links)} enlaces diferentes.")
+            #print(f"Ruta '{ruta}' accesible desde {len(links)} enlaces diferentes.")
             if rutas_con_multiples_enlaces == 1:
-                screenshot_path = os.path.join(output_folder, f"multiple_links_{ruta.strip('/').replace('/', '_')}.png")
-                links[0].screenshot(screenshot_path)
+                links[0].screenshot(f"multiple_links_{ruta.strip('/').replace('/', '_')}.png")
         else:
             rutas_unicas += 1
 
     if rutas_con_multiples_enlaces > 0:
-        print(f"Se encontraron {rutas_con_multiples_enlaces} rutas accesibles desde múltiples enlaces.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 8, f"- Se encontraron {rutas_con_multiples_enlaces} rutas accesibles desde múltiples enlaces.")
+        #print(f"Se encontraron {rutas_con_multiples_enlaces} rutas accesibles desde múltiples enlaces.")
     else:
         print("No se encontraron rutas accesibles desde múltiples enlaces.")
 
@@ -789,19 +964,31 @@ def hdu_tres(url):
     action_links = driver.find_elements(By.CSS_SELECTOR, 'a[target="_blank"], a[download], a[href^="javascript"], a[rel*="noopener"], a[rel*="noreferrer"], a[href*="file"], a[href*="download"], a[href*="pdf"]')
 
     if action_links:
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 8, f"- Se encontraron {len(action_links)} enlaces que ejecutan acciones especiales (descargas, abrir nuevas ventanas).")
         print(f"Se encontraron {len(action_links)} enlaces que ejecutan acciones especiales (descargas, abrir nuevas ventanas).")
         for link in action_links:
             link_text = link.text.strip()
             href = link.get_attribute('href')
 
             if not link_text:
-                print(f"Advertencia: Enlace de acción especial sin texto visible. Enlace: {href}")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, f"- Advertencia: Enlace de acción especial sin texto visible. Enlace: {href}")
+                #print(f"Advertencia: Enlace de acción especial sin texto visible. Enlace: {href}")
             else:
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, f"- Enlace de acción especial encontrado: {link_text} - Enlace: {href}")
                 print(f"Enlace de acción especial encontrado: {link_text} - Enlace: {href}")
 
             title_attr = link.get_attribute('title')
             aria_label = link.get_attribute('aria-label')
             if title_attr or aria_label:
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, f"- Enlace mejorado con atributos de accesibilidad: title='{title_attr}', aria-label='{aria_label}'")
                 print(f"Enlace mejorado con atributos de accesibilidad: title='{title_attr}', aria-label='{aria_label}'")
     else:
         print("No se encontraron enlaces con acciones especiales diferenciadas.")
@@ -838,29 +1025,44 @@ def hdu_tres(url):
             if logo_link.get_attribute('href') == home_link.get_attribute('href'):
                 print("Tanto el logo como el botón de Inicio llevan al usuario de vuelta a la página principal.")
             else:
-                print("El logo y el botón de Inicio no llevan al usuario de vuelta a la página principal de manera consistente.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, "- El logo y el botón de Inicio no llevan al usuario de vuelta a la página principal de manera consistente.")
+                #print("El logo y el botón de Inicio no llevan al usuario de vuelta a la página principal de manera consistente.")
 
             driver.get(logo_link.get_attribute('href'))
             if driver.current_url == logo_link.get_attribute('href'):
                 print("El logo lleva correctamente a la página principal.")
             else:
-                print("El logo NO lleva correctamente a la página principal.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, "- El logo no lleva correctamente a la página principal.")
+                print("El logo no lleva correctamente a la página principal.")
 
             driver.get(home_link.get_attribute('href'))
             if driver.current_url == home_link.get_attribute('href'):
                 print("El botón de Inicio lleva correctamente a la página principal.")
             else:
-                print("El botón de Inicio NO lleva correctamente a la página principal.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, "- El botón de Inicio no lleva correctamente a la página principal.")
+                print("El botón de Inicio no lleva correctamente a la página principal.")
         else:
             if not logo_link:
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, "- No se encontró el logo que lleve a la página principal.")
                 print("No se encontró el logo que lleve a la página principal.")
             if not home_link:
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, "- No se encontró el botón de Inicio que lleve a la página principal.")
                 print("No se encontró el botón de Inicio que lleve a la página principal.")
 
     except NoSuchElementException:
         print("No se encontró el elemento de logo o botón de Inicio.")
     except Exception as e:
-        print(f"Error inesperado durante la verificación: {str(e)}")
+        pass
 
     # --- Verificación de consistencia en la ubicación de instrucciones, preguntas y mensajes ---
     try:
@@ -872,10 +1074,16 @@ def hdu_tres(url):
             if len(locations) == 1:
                 print("Las instrucciones, preguntas y mensajes están ubicados consistentemente en el mismo lugar en cada página.")
             else:
-                print(f"Advertencia: Se encontraron {len(locations)} ubicaciones distintas para instrucciones, preguntas y mensajes.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, f"- Advertencia: Se encontró {len(locations)} ubicacion(es) distinta(s) para instrucciones, preguntas y mensajes.")
+                #print(f"Advertencia: Se encontró {len(locations)} ubicacion(es) distinta(s) para instrucciones, preguntas y mensajes.")
 
             for elem in instruction_elements:
-                print(f"Elemento de instrucción encontrado en posición relativa X: {elem.location['x']} Y: {elem.location['y']}.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(0, 8, f"- Elemento de instrucción encontrado en posición relativa X: {elem.location['x']} Y: {elem.location['y']}.")
+                #print(f"Elemento de instrucción encontrado en posición relativa X: {elem.location['x']} Y: {elem.location['y']}.")
         else:
             print("No se encontraron elementos de instrucciones, preguntas o mensajes en la página.")
     except Exception as e:
@@ -887,12 +1095,18 @@ def hdu_tres(url):
         error_pages = driver.find_elements(By.CSS_SELECTOR, '.error-message, .error-page, .alert-danger, .validation-error')
 
         if help_pages:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, f"- Se encontraron {len(help_pages)} páginas de ayuda disponibles.")
             print(f"Se encontraron {len(help_pages)} páginas de ayuda disponibles.")
         else:
             print("No se encontraron páginas de ayuda.")
 
         if error_pages:
-            print(f"Se encontraron {len(error_pages)} mensajes de error detallados.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 8, f"- Se encontraron {len(error_pages)} mensajes de error detallados.")
+            #print(f"Se encontraron {len(error_pages)} mensajes de error detallados.")
         else:
             print("No se encontraron mensajes de error detallados.")
     except Exception as e:
@@ -903,6 +1117,11 @@ def hdu_tres(url):
 
 def hdu_cuatro(url):
 
+    pdf.ln(10)
+
+    pdf.set_font("Arial", size=11)
+
+    pdf.cell(200, 10, txt="Formularios", align='C')
 
     # Navegar a la URL
     driver.get(url)
@@ -916,66 +1135,98 @@ def hdu_cuatro(url):
         default_value = field.get_attribute('value').strip()
 
         if default_value:
-            print(f"Campo de entrada '{field_name}' de tipo '{field_type}' con valor predeterminado: '{default_value}'")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10, txt=f"- Campo de entrada '{field_name}' de tipo '{field_type}' con valor predeterminado: '{default_value}'")
 
             # Validar longitud del valor predeterminado
             if len(default_value) < 3 or len(default_value) > 255:
-                print(f"Advertencia: El valor predeterminado para el campo '{field_name}' tiene una longitud inusual: {len(default_value)} caracteres.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado para el campo '{field_name}' tiene una longitud inusual: {len(default_value)} caracteres.")
 
             # Validar estructura dependiendo del tipo de campo
             if field_type == 'email':
                 if not re.match(r"[^@]+@[^@]+\.[^@]+", default_value):
-                    print(f"Advertencia: El valor predeterminado para el campo de correo electrónico '{field_name}' no tiene una estructura válida.")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado para el campo de correo electrónico '{field_name}' no tiene una estructura válida.")
 
             elif field_type == 'tel':
                 if not re.match(r"^\+?\d{10,15}$", default_value):
-                    print(f"Advertencia: El valor predeterminado para el campo de teléfono '{field_name}' no tiene una estructura válida.")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado para el campo de teléfono '{field_name}' no tiene una estructura válida.")
 
             elif field_type == 'number':
                 try:
                     float(default_value)
                 except ValueError:
-                    print(f"Advertencia: El valor predeterminado para el campo numérico '{field_name}' no es un número válido.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado para el campo numérico '{field_name}' no es un número válido.")
 
             elif field_type == 'text' and ('date' in field_name.lower() or 'date' in field_placeholder.lower()):
                 if not re.match(r"^\d{4}-\d{2}-\d{2}$", default_value):
-                    print(f"Advertencia: El valor predeterminado para el campo de fecha '{field_name}' no sigue el formato YYYY-MM-DD.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado para el campo de fecha '{field_name}' no sigue el formato YYYY-MM-DD.")
 
             elif field_type == 'text' and ('currency' in field_name.lower() or 'currency' in field_placeholder.lower()):
                 if not re.match(r"^\$?\d+(\.\d{2})?$", default_value):
-                    print(f"Advertencia: El valor predeterminado para el campo de moneda '{field_name}' no tiene un formato de moneda válido.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado para el campo de moneda '{field_name}' no tiene un formato de moneda válido.")
 
             elif field_type == 'url':
                 if not re.match(r"^(https?|ftp)://[^\s/$.?#].[^\s]*$", default_value):
-                    print(f"Advertencia: El valor predeterminado para el campo de URL '{field_name}' no tiene una estructura válida.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado para el campo de URL '{field_name}' no tiene una estructura válida.")
 
             elif field_type == 'password':
                 if len(default_value) < 8:
-                    print(f"Advertencia: El valor predeterminado para el campo de contraseña '{field_name}' es demasiado corto (menor a 8 caracteres).")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado para el campo de contraseña '{field_name}' es demasiado corto (menor a 8 caracteres).")
 
             elif field_type == 'checkbox' or field_type == 'radio':
                 if default_value not in ['on', 'off']:
-                    print(f"Advertencia: El valor predeterminado para el campo de selección '{field_name}' tiene un valor inusual: '{default_value}'")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado para el campo de selección '{field_name}' tiene un valor inusual: '{default_value}'")
 
             # Validación adicional: campos que deberían estar vacíos
             if field_type == 'password' or field_type == 'hidden':
                 if default_value:
-                    print(f"Advertencia: El campo '{field_name}' de tipo '{field_type}' no debería tener un valor predeterminado visible.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Advertencia: El campo '{field_name}' de tipo '{field_type}' no debería tener un valor predeterminado visible.")
         else:
-            print(f"Campo de entrada '{field_name}' de tipo '{field_type}' no tiene valor predeterminado.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo de entrada '{field_name}' de tipo '{field_type}' no tiene valor predeterminado.")
 
         # Verificación adicional: uso de placeholders en lugar de valores predeterminados
         if field_placeholder:
-            print(f"Campo de entrada '{field_name}' con placeholder: '{field_placeholder}'")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo de entrada '{field_name}' con placeholder: '{field_placeholder}'")
             # Validación de longitud y formato según el placeholder
             if 'phone' in field_placeholder.lower() and not re.match(r"^\+?\d{10,15}$", default_value):
-                print(f"Advertencia: El valor del placeholder '{field_placeholder}' en el campo '{field_name}' no coincide con un formato de teléfono válido.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Advertencia: El valor del placeholder '{field_placeholder}' en el campo '{field_name}' no coincide con un formato de teléfono válido.")
             elif 'date' in field_placeholder.lower() and not re.match(r"^\d{4}-\d{2}-\d{2}$", default_value):
-                print(f"Advertencia: El valor del placeholder '{field_placeholder}' en el campo '{field_name}' no sigue el formato YYYY-MM-DD.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Advertencia: El valor del placeholder '{field_placeholder}' en el campo '{field_name}' no sigue el formato YYYY-MM-DD.")
 
     invalid_fields = [field for field in input_fields if not field.get_attribute('value') and not field.get_attribute('placeholder')]
     if invalid_fields:
-        print(f"Advertencia: Se encontraron {len(invalid_fields)} campos de entrada sin valores predeterminados ni placeholders útiles.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, txt=f"- Advertencia: Se encontraron {len(invalid_fields)} campos de entrada sin valores predeterminados ni placeholders útiles.")
 
     # 16. Verificación de formateo automático de datos
     for field in input_fields:
@@ -987,16 +1238,24 @@ def hdu_cuatro(url):
         autocomplete = field.get_attribute('autocomplete')
 
         if pattern or input_mode:
-            print(f"Campo '{field_name}' con formateo automático detectado (pattern: {pattern}, inputmode: {input_mode})")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo '{field_name}' con formateo automático detectado (pattern: {pattern}, inputmode: {input_mode})")
 
         if input_mode:
             if input_mode == 'numeric' and field_type == 'text':
-                print(f"Campo '{field_name}' utiliza 'inputmode=numeric' para facilitar la entrada de datos numéricos.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Campo '{field_name}' utiliza 'inputmode=numeric' para facilitar la entrada de datos numéricos.")
             elif input_mode == 'decimal' and field_type == 'text':
-                print(f"Campo '{field_name}' utiliza 'inputmode=decimal' para facilitar la entrada de números decimales.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Campo '{field_name}' utiliza 'inputmode=decimal' para facilitar la entrada de números decimales.")
 
         if autocomplete:
-            print(f"Campo '{field_name}' tiene habilitado el autocompletado con 'autocomplete={autocomplete}'.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo '{field_name}' tiene habilitado el autocompletado con 'autocomplete={autocomplete}'.")
 
     # 17. Detección de etiquetas para campos requeridos y opcionales
     palabras_clave_requerido = ['required', 'obligatorio', 'necesario', '*', 'must', 'mandatory']
@@ -1006,22 +1265,34 @@ def hdu_cuatro(url):
         text = label.text.lower()
 
         if any(palabra in text for palabra in palabras_clave_requerido):
-            print(f"Etiqueta de campo requerido detectada: {text}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Etiqueta de campo requerido detectada: {text}")
         elif any(palabra in text for palabra in palabras_clave_opcional):
-            print(f"Etiqueta de campo opcional detectada: {text}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Etiqueta de campo opcional detectada: {text}")
         else:
             for_attr = label.get_attribute('for')
             associated_input = driver.find_element(By.ID, for_attr) if for_attr else None
 
             if associated_input:
                 if associated_input.get_attribute('required'):
-                    print(f"Campo asociado a la etiqueta '{text}' es requerido basado en el atributo 'required'.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Campo asociado a la etiqueta '{text}' es requerido basado en el atributo 'required'.")
                 elif associated_input.get_attribute('aria-required') == 'true':
-                    print(f"Campo asociado a la etiqueta '{text}' es requerido basado en 'aria-required=true'.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Campo asociado a la etiqueta '{text}' es requerido basado en 'aria-required=true'.")
                 else:
-                    print(f"Campo asociado a la etiqueta '{text}' no indica si es requerido u opcional.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Campo asociado a la etiqueta '{text}' no indica si es requerido u opcional.")
             else:
-                print(f"Advertencia: No se encontró un campo asociado para la etiqueta '{text}'.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Advertencia: No se encontró un campo asociado para la etiqueta '{text}'.")
 
     input_fields = driver.find_elements(By.CSS_SELECTOR, 'input, textarea, select')
     for field in input_fields:
@@ -1031,13 +1302,21 @@ def hdu_cuatro(url):
 
         if field.get_attribute('required') or field.get_attribute('aria-required') == 'true':
             if aria_label:
-                print(f"Campo '{aria_label}' es requerido basado en atributos ARIA.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Campo '{aria_label}' es requerido basado en atributos ARIA.")
             elif placeholder:
-                print(f"Campo con placeholder '{placeholder}' es requerido basado en atributos HTML.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Campo con placeholder '{placeholder}' es requerido basado en atributos HTML.")
             else:
-                print(f"Campo '{field_name}' es requerido pero no tiene una etiqueta visible asociada.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Campo '{field_name}' es requerido pero no tiene una etiqueta visible asociada.")
         elif 'optional' in (aria_label or '').lower() or 'optional' in (placeholder or '').lower():
-            print(f"Campo '{aria_label or placeholder}' es opcional.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo '{aria_label or placeholder}' es opcional.")
 
     print("Detección de etiquetas de campos completada.")
 
@@ -1062,21 +1341,35 @@ def hdu_cuatro(url):
         min_size = size_thresholds.get(field_type, 100)
 
         if size >= min_size:
-            print(f"Campo de tipo {field_type} con tamaño adecuado ({size}px de ancho).")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo de tipo {field_type} con tamaño adecuado ({size}px de ancho).")
         else:
-            print(f"Advertencia: Campo de tipo {field_type} con tamaño insuficiente ({size}px de ancho).")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Advertencia: Campo de tipo {field_type} con tamaño insuficiente ({size}px de ancho).")
 
         if max_length:
-            print(f"Campo de tipo {field_type} tiene un 'maxlength' de {max_length}.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo de tipo {field_type} tiene un 'maxlength' de {max_length}.")
         if min_length:
-            print(f"Campo de tipo {field_type} tiene un 'minlength' de {min_length}.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo de tipo {field_type} tiene un 'minlength' de {min_length}.")
 
         default_value = field.get_attribute('value') or ''
         if len(default_value) > 0 and size < len(default_value) * 8:
-            print(f"Advertencia: El valor predeterminado podría no ser completamente visible en el campo ({size}px de ancho).")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Advertencia: El valor predeterminado podría no ser completamente visible en el campo ({size}px de ancho).")
+            #print(f"Advertencia: El valor predeterminado podría no ser completamente visible en el campo ({size}px de ancho).")
 
         if placeholder and size < len(placeholder) * 8:
-            print(f"Advertencia: El placeholder '{placeholder}' podría no ser completamente visible en el campo ({size}px de ancho).")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Advertencia: El placeholder '{placeholder}' podría no ser completamente visible en el campo ({size}px de ancho).")
+            #print(f"Advertencia: El placeholder '{placeholder}' podría no ser completamente visible en el campo ({size}px de ancho).")
 
     print("Verificación del tamaño de las cajas de texto completada.")
 
@@ -1086,22 +1379,43 @@ def hdu_cuatro(url):
     checkboxes = driver.find_elements(By.CSS_SELECTOR, 'input[type="checkbox"]')
 
     if select_fields:
-        print(f"Se encontraron {len(select_fields)} listas de opciones.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, txt=f"- Se encontraron {len(select_fields)} listas de opciones.")
+        #print(f"Se encontraron {len(select_fields)} listas de opciones.")
     else:
-        print("No se encontraron listas de opciones.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, txt="- No se encontraron listas de opciones.")
+        #print("No se encontraron listas de opciones.")
 
     if radio_buttons:
-        print(f"Se encontraron {len(radio_buttons)} botones de radio.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, txt=f"- Se encontraron {len(radio_buttons)} botones de radio.")
+        #print(f"Se encontraron {len(radio_buttons)} botones de radio.")
     else:
-        print("No se encontraron botones de radio.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, txt="- No se encontraron botones de radio.")
+        #print("No se encontraron botones de radio.")
 
     if checkboxes:
-        print(f"Se encontraron {len(checkboxes)} casillas de verificación.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, txt=f"- Se encontraron {len(checkboxes)} casillas de verificación.")
+        #print(f"Se encontraron {len(checkboxes)} casillas de verificación.")
     else:
-        print("No se encontraron casillas de verificación.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, txt="- No se encontraron casillas de verificación.")
+        #print("No se encontraron casillas de verificación.")
 
     if not select_fields and not radio_buttons and not checkboxes:
-        print("Advertencia: No se encontraron listas de opciones, botones de radio o casillas de verificación, revisa si se está utilizando adecuadamente cajas de texto.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, txt="- Advertencia: No se encontraron listas de opciones, botones de radio o casillas de verificación, revisa si se está utilizando adecuadamente cajas de texto.")
+        #print("Advertencia: No se encontraron listas de opciones, botones de radio o casillas de verificación, revisa si se está utilizando adecuadamente cajas de texto.")
 
     # 20. Verificación de posición automática del cursor en el campo adecuado
     focused_element = driver.switch_to.active_element
@@ -1113,11 +1427,20 @@ def hdu_cuatro(url):
         first_relevant_element = form_elements[0] if form_elements else None
 
         if first_relevant_element and first_relevant_element == focused_element:
-            print(f"El cursor está correctamente posicionado en el primer campo relevante: {field_name} de tipo {field_type}.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- El cursor está correctamente posicionado en el primer campo relevante: {field_name} de tipo {field_type}.")
+            #print(f"El cursor está correctamente posicionado en el primer campo relevante: {field_name} de tipo {field_type}.")
         else:
-            print(f"Advertencia: El cursor está en el campo: {field_name}, pero podría no ser el primer campo relevante.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Advertencia: El cursor está en el campo: {field_name}, pero podría no ser el primer campo relevante.")
+            #print(f"Advertencia: El cursor está en el campo: {field_name}, pero podría no ser el primer campo relevante.")
     else:
-        print("No se detectó que el cursor esté posicionado automáticamente en un campo.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10, txt="- No se detectó que el cursor esté posicionado automáticamente en un campo.")
+        #print("No se detectó que el cursor esté posicionado automáticamente en un campo.")
 
     # 21. Verificación de formatos claramente indicados en campos de entrada
     for field in input_fields:
@@ -1128,22 +1451,40 @@ def hdu_cuatro(url):
         aria_label = field.get_attribute('aria-label')
 
         if placeholder:
-            print(f"Campo con formato sugerido mediante placeholder: {placeholder}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f" -Campo con formato sugerido mediante placeholder: {placeholder}")
+            #print(f"Campo con formato sugerido mediante placeholder: {placeholder}")
 
         if pattern:
-            print(f"Campo con validación mediante patrón: {pattern}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo con validación mediante patrón: {pattern}")
+            #print(f"Campo con validación mediante patrón: {pattern}")
 
         if input_mode:
-            print(f"Campo con sugerencia de input mode: {input_mode}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo con sugerencia de input mode: {input_mode}")
+            #print(f"Campo con sugerencia de input mode: {input_mode}")
 
         if title:
-            print(f"Campo con formato descrito en el título: {title}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo con formato descrito en el título: {title}")
+            #print(f"Campo con formato descrito en el título: {title}")
 
         if aria_label:
-            print(f"Campo con indicación de formato en aria-label: {aria_label}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Campo con indicación de formato en aria-label: {aria_label}")
+            #print(f"Campo con indicación de formato en aria-label: {aria_label}")
 
         if not any([placeholder, pattern, input_mode, title, aria_label]):
-            print(f"Advertencia: El campo {field.get_attribute('name') or field.get_attribute('id')} no tiene una indicación clara de formato.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- Advertencia: El campo {field.get_attribute('name') or field.get_attribute('id')} no tiene una indicación clara de formato.")
+            #print(f"Advertencia: El campo {field.get_attribute('name') or field.get_attribute('id')} no tiene una indicación clara de formato.")
 
     # 22. Validación automática de formularios
     forms = driver.find_elements(By.TAG_NAME, 'form')
@@ -1151,11 +1492,20 @@ def hdu_cuatro(url):
         if not form.get_attribute('novalidate'):
             form_id_or_name = form.get_attribute('id') or form.get_attribute('name')
             if form_id_or_name:
-                print(f"Formulario con validación automática detectado: {form_id_or_name}")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Formulario con validación automática detectado: {form_id_or_name}")
+                #print(f"Formulario con validación automática detectado: {form_id_or_name}")
             else:
-                print("Formulario sin ID o nombre específico detectado, pero con validación automática.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt="- Formulario sin ID o nombre específico detectado, pero con validación automática.")
+                #print("Formulario sin ID o nombre específico detectado, pero con validación automática.")
         else:
-            print("Formulario sin validación automática detectado.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt="- Formulario sin validación automática detectado.")
+            #print("Formulario sin validación automática detectado.")
 
     # 23. Verificación de validación en tiempo real de los campos de entrada
     for field in input_fields:
@@ -1164,9 +1514,15 @@ def hdu_cuatro(url):
           any(attr in field.get_attribute('outerHTML') for attr in ['pattern', 'required', 'maxlength']):
             field_name_or_id = field.get_attribute('name') or field.get_attribute('id')
             if field_name_or_id:
-                print(f"Campo con validación en tiempo real detectado: {field_name_or_id}")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- Campo con validación en tiempo real detectado: {field_name_or_id}")
+                #print(f"Campo con validación en tiempo real detectado: {field_name_or_id}")
             else:
-                print("Campo sin ID o nombre específico detectado, pero con validación en tiempo real.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt="- Campo sin ID o nombre específico detectado, pero con validación en tiempo real.")
+                #print("Campo sin ID o nombre específico detectado, pero con validación en tiempo real.")
 
     # 25. Verificación de la posición de etiquetas cerca de los campos correspondientes
     labels = driver.find_elements(By.TAG_NAME, 'label')
@@ -1178,14 +1534,26 @@ def hdu_cuatro(url):
                 if field.is_displayed():
                     vertical_distance = abs(label.location['y'] - field.location['y'])
                     horizontal_distance = abs(label.location['x'] - field.location['x'])
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Etiqueta '{label.text}' está a {vertical_distance}px verticalmente y a {horizontal_distance}px horizontalmente de su campo asociado.")
 
-                    print(f"Etiqueta '{label.text}' está a {vertical_distance}px verticalmente y a {horizontal_distance}px horizontalmente de su campo asociado.")
+                    #print(f"Etiqueta '{label.text}' está a {vertical_distance}px verticalmente y a {horizontal_distance}px horizontalmente de su campo asociado.")
                 else:
-                    print(f"Campo asociado con ID '{associated_field_id}' no está visible.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Campo asociado con ID '{associated_field_id}' no está visible.")
+                    #print(f"Campo asociado con ID '{associated_field_id}' no está visible.")
             except NoSuchElementException:
-                print(f"No se encontró el campo con ID '{associated_field_id}' asociado a la etiqueta '{label.text}'.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- No se encontró el campo con ID '{associated_field_id}' asociado a la etiqueta '{label.text}'.")
+                #print(f"No se encontró el campo con ID '{associated_field_id}' asociado a la etiqueta '{label.text}'.")
         else:
-            print(f"La etiqueta '{label.text}' no está asociada con ningún campo.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10, txt=f"- La etiqueta '{label.text}' no está asociada con ningún campo.")
+            #print(f"La etiqueta '{label.text}' no está asociada con ningún campo.")
 
     # 26. Verificación de la posibilidad de cambiar valores predeterminados
     for field in input_fields:
@@ -1204,13 +1572,25 @@ def hdu_cuatro(url):
 
                         # Verificación de que el valor se ha cambiado
                         if field.get_attribute('value') == test_value:
-                            print(f"El campo '{field_name_or_id}' permite cambiar el valor predeterminado.")
+                            pdf.set_font("Arial", size=8)
+                            pdf.set_x(15)
+                            pdf.multi_cell(200,10, txt=f"- El campo '{field_name_or_id}' permite cambiar el valor predeterminado.")
+                            #print(f"El campo '{field_name_or_id}' permite cambiar el valor predeterminado.")
                         else:
-                            print(f"El campo '{field_name_or_id}' NO permite cambiar el valor predeterminado, cambio fallido.")
+                            pdf.set_font("Arial", size=8)
+                            pdf.set_x(15)
+                            pdf.multi_cell(200,10, txt=f"- El campo '{field_name_or_id}' NO permite cambiar el valor predeterminado, cambio fallido.")
+                            #print(f"El campo '{field_name_or_id}' NO permite cambiar el valor predeterminado, cambio fallido.")
                     else:
-                        print(f"El campo '{field_name_or_id}' no es un tipo de campo editable (tipo {field.get_attribute('type')}).")
+                        pdf.set_font("Arial", size=8)
+                        pdf.set_x(15)
+                        pdf.multi_cell(200,10, txt=f"- El campo '{field_name_or_id}' no es un tipo de campo editable (tipo {field.get_attribute('type')}).")
+                        #print(f"El campo '{field_name_or_id}' no es un tipo de campo editable (tipo {field.get_attribute('type')}).")
                 except Exception as interaction_error:
-                    print(f"Hubo un problema al intentar cambiar el valor del campo '{field_name_or_id}': {interaction_error}")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Hubo un problema al intentar cambiar el valor del campo '{field_name_or_id}': {interaction_error}")
+                    #print(f"Hubo un problema al intentar cambiar el valor del campo '{field_name_or_id}': {interaction_error}")
 
                 # Intentar restaurar el valor original si fue cambiado
                 try:
@@ -1218,16 +1598,33 @@ def hdu_cuatro(url):
                         field.clear()
                         field.send_keys(original_value)
                 except Exception as restore_error:
-                    print(f"Hubo un problema al intentar restaurar el valor original del campo '{field_name_or_id}': {restore_error}")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10, txt=f"- Hubo un problema al intentar restaurar el valor original del campo '{field_name_or_id}': {restore_error}")
+                    #print(f"Hubo un problema al intentar restaurar el valor original del campo '{field_name_or_id}': {restore_error}")
             else:
-                print(f"El campo '{field_name_or_id}' está deshabilitado, es de solo lectura, no es visible, o no es un campo de entrada.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10, txt=f"- El campo '{field_name_or_id}' está deshabilitado, es de solo lectura, no es visible, o no es un campo de entrada.")
+                #print(f"El campo '{field_name_or_id}' está deshabilitado, es de solo lectura, no es visible, o no es un campo de entrada.")
         except Exception as e:
             print(f"Hubo un problema al interactuar con el campo '{field_name_or_id}': {e}")
 
     # Cerrar el driver
     driver.quit
-def hdu_cinco(url):
+    
+    
+def hdu_cinco(url): 
 
+    pdf.ln(10)
+
+    pdf.set_font("Arial", size=11)
+
+    pdf.cell(200, 10, txt="Confianza y Credibilidad", ln=True, align='C')
+
+    pdf.set_font("Arial", size=10)
+
+    pdf.cell(200, 10, txt="Anuncios y Pop-Ups:", ln=True, align='L')
 
     # Navegar a la URL
     driver.get(url)
@@ -1237,41 +1634,36 @@ def hdu_cinco(url):
 
     # Selección ampliada para detectar varios tipos de anuncios y pop-ups
     ads_selectors = [
-        '[class*="ad"]', '[id*="ad"]', '[class*="pop"]', '[id*="pop"]',
-        '[class*="banner"]', '[id*="banner"]', '[class*="promo"]', '[id*="promo"]',
-        '[class*="modal"]', '[id*="modal"]', '[class*="overlay"]', '[id*="overlay"]',
-        '[class*="sponsor"]', '[id*="sponsor"]'
+        '[class*="ad"]', '[id*="ad"]', '[class*="pop"]', '[id*="pop"]'
     ]
     ads = []
 
+    # Búsqueda de anuncios y pop-ups en la página principal
     for selector in ads_selectors:
         elements = driver.find_elements(By.CSS_SELECTOR, selector)
         for element in elements:
-            if element.is_displayed():
+            # Verificar si el elemento está visible de forma segura
+            if is_element_displayed_safely(element):
                 ads.append(element)
-
-    # Cambio de contexto para buscar en iframes si es necesario
-    iframes = driver.find_elements(By.TAG_NAME, 'iframe')
-    for iframe in iframes:
-        driver.switch_to.frame(iframe)
-        for selector in ads_selectors:
-            elements = driver.find_elements(By.CSS_SELECTOR, selector)
-            for element in elements:
-                if element.is_displayed():
-                    ads.append(element)
-        driver.switch_to.default_content()
 
     # Resultado de la detección
     if ads:
-        print(f"Se detectaron {len(ads)} anuncios o pop-ups en la página.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= f"- Se detectaron {len(ads)} anuncios, pop-ups o elementos distractores en la página.")
     else:
-        print("No se detectaron anuncios ni pop-ups.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- No se detectaron anuncios ni pop-ups.")
 
     # 28. Verificación de la presencia del logo en cada página
     logo_selectors = [
         'a.logo', 'img[alt*="logo"]', '[class*="logo"]', '[id*="logo"]',
         'img[src*="logo"]', '[class*="header-logo"]', '[class*="site-logo"]', '[class*="brand-logo"]'
     ]
+
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Logo Constante:", ln=True, align='L')
 
     logo_elements = []
     for selector in logo_selectors:
@@ -1280,22 +1672,20 @@ def hdu_cinco(url):
             if element.is_displayed():
                 logo_elements.append(element)
 
-    # Cambio de contexto para buscar logos en iframes si es necesario
-    for iframe in iframes:
-        driver.switch_to.frame(iframe)
-        for selector in logo_selectors:
-            elements = driver.find_elements(By.CSS_SELECTOR, selector)
-            for element in elements:
-                if element.is_displayed():
-                    logo_elements.append(element)
-        driver.switch_to.default_content()
-
     # Resultado de la verificación
     if logo_elements:
-        print("El logo de la marca aparece en la página.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- El logo de la marca aparece en la página.")
+        #print("El logo de la marca aparece en la página.")
     else:
-        print("El logo de la marca NO aparece en la página.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- El logo de la marca NO aparece en la página.")
+        #print("El logo de la marca NO aparece en la página.")
 
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Potenciales Errores:", ln=True, align='L')
     # 29. Detección de errores tipográficos y ortográficos
     spell = SpellChecker(language='es')  # Cambia a 'en' para inglés u otros idiomas según sea necesario
 
@@ -1315,10 +1705,18 @@ def hdu_cinco(url):
     found_errors = misspelled.union(set(word for word in common_mistakes if word in words))
 
     if found_errors:
-        print(f"Se detectaron errores tipográficos u ortográficos: {found_errors}")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200, 10, txt=f"- Se detectaron palabras desconocidas, alguna(s) podría(n) ser errores: {', '.join(map(str, found_errors[0:5]))}")
+        #print(f"Se detectaron errores tipográficos u ortográficos: {found_errors}")
     else:
-        print("No se detectaron errores tipográficos u ortográficos.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- No se detectaron errores tipográficos u ortográficos que requieran atención inmediata.")
+        #print("No se detectaron errores tipográficos u ortográficos.")
 
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Listas y Viñetas:", ln=True, align='L')
     # 30. Detección de Listas y Viñetas
     # Detectar listas no ordenadas, ordenadas y listas de definiciones
     list_types = ['ul', 'ol', 'dl']
@@ -1331,10 +1729,18 @@ def hdu_cinco(url):
 
     # Resultado de la detección
     if lists:
-        print(f"Se encontraron {len(lists)} listas (viñetas, numeradas o de definiciones) en la página.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt=f"- Se encontraron {len(lists)} listas (viñetas, numeradas o de definiciones) en la página." )
+        #print(f"Se encontraron {len(lists)} listas (viñetas, numeradas o de definiciones) en la página.")
     else:
-        print("No se encontraron listas en la página, posible uso excesivo de texto narrativo.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- No se encontraron listas en la página, posible uso excesivo de texto narrativo.")
+        #print("No se encontraron listas en la página, posible uso excesivo de texto narrativo.")
 
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Jerarquia de Contenido:", ln=True, align='L')
     # 31. Evaluación de la Jerarquía del Contenido mediante Encabezados (H1, H2, etc.)
     headers = driver.find_elements(By.CSS_SELECTOR, 'h1, h2, h3, h4, h5, h6')
     if headers:
@@ -1344,24 +1750,44 @@ def hdu_cinco(url):
             header_text = header.text.strip()
             if header.is_displayed() and header_text:
                 current_level = int(header.tag_name[1])
-                print(f"Encabezado {header.tag_name.upper()} encontrado: {header_text}")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)
+                pdf.multi_cell(200,10,txt= f"- Encabezado {header.tag_name.upper()} encontrado: {header_text}")
+                #print(f"Encabezado {header.tag_name.upper()} encontrado: {header_text}")
 
                 # Verificar jerarquía
                 if current_level > last_level + 1:
-                    print(f"Advertencia: El encabezado {header.tag_name.upper()} parece estar fuera de orden jerárquico.")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10,txt=f"- Advertencia: El encabezado {header.tag_name.upper()} parece estar fuera de orden jerárquico." )
+                    #print(f"Advertencia: El encabezado {header.tag_name.upper()} parece estar fuera de orden jerárquico.")
                     hierarchy_correct = False
 
                 last_level = current_level
             else:
-                print(f"Encabezado {header.tag_name.upper()} encontrado, pero está vacío o no es visible.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)
+                pdf.multi_cell(200,10,txt= f"- Encabezado {header.tag_name.upper()} encontrado, pero está vacío o no es visible.")
+                #print(f"Encabezado {header.tag_name.upper()} encontrado, pero está vacío o no es visible.")
 
         if hierarchy_correct:
-            print("La jerarquía de encabezados está presente y parece correcta.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= "- La jerarquía de encabezados está presente y parece correcta.")
+            #print("La jerarquía de encabezados está presente y parece correcta.")
         else:
-            print("Se detectaron posibles problemas en la jerarquía de encabezados.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= "- Se detectaron posibles problemas en la jerarquía de encabezados.")
+            #print("Se detectaron posibles problemas en la jerarquía de encabezados.")
     else:
-        print("No se encontraron encabezados, posible falta de estructura jerárquica en el contenido.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt="- No se encontraron encabezados, posible falta de estructura jerárquica en el contenido.")
+        #print("No se encontraron encabezados, posible falta de estructura jerárquica en el contenido.")
 
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Legibilidad del Sitio:", ln=True, align='L')
     # 32. Análisis de la Estructura de las Páginas para Mejorar la Legibilidad
     large_titles = driver.find_elements(By.CSS_SELECTOR, 'h1')
     subtitles = driver.find_elements(By.CSS_SELECTOR, 'h2, h3, h4')
@@ -1373,14 +1799,26 @@ def hdu_cinco(url):
         long_paragraphs = [p for p in paragraphs if len(p.text.split()) > 100]  # Umbral de 100 palabras por párrafo
 
         if long_paragraphs:
-            print(f"Se detectaron {len(long_paragraphs)} párrafos largos. Considera dividirlos para mejorar la legibilidad.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Se detectaron {len(long_paragraphs)} párrafos largos. Considera dividirlos para mejorar la legibilidad.")
+            #print(f"Se detectaron {len(long_paragraphs)} párrafos largos. Considera dividirlos para mejorar la legibilidad.")
         else:
-            print("Los párrafos son cortos y adecuados para la legibilidad.")
-
-        print("La página contiene títulos grandes, subtítulos y párrafos cortos, lo que mejora la legibilidad.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= "- Los párrafos son cortos y adecuados para la legibilidad.")
+            #print("Los párrafos son cortos y adecuados para la legibilidad.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- La página contiene títulos grandes, subtítulos y párrafos cortos, lo que mejora la legibilidad.")
+        #print("La página contiene títulos grandes, subtítulos y párrafos cortos, lo que mejora la legibilidad.")
     else:
-        print("La estructura de la página podría no estar optimizada para la legibilidad.")
-
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- La estructura de la página podría no estar optimizada para la legibilidad.")
+        #print("La estructura de la página podría no estar optimizada para la legibilidad.")
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Longitud de Titulos y Subtitulos:", ln=True, align='L')
     # 33. Análisis de la Longitud y Descriptividad de Títulos y Subtítulos
     title_threshold = 60  # Definir un umbral para la longitud de los títulos
     def is_descriptive(text):
@@ -1390,35 +1828,60 @@ def hdu_cinco(url):
     for title in large_titles:
         title_length = len(title.text)
         if title_length > title_threshold:
-            print(f"Título largo detectado: {title.text} (longitud: {title_length} caracteres).")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Título largo detectado: {title.text} (longitud: {title_length} caracteres).")
+            #print(f"Título largo detectado: {title.text} (longitud: {title_length} caracteres).")
         elif not is_descriptive(title.text):
-            print(f"Título genérico o poco descriptivo detectado: {title.text}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt=f"- Título genérico o poco descriptivo detectado: {title.text}" )
+            #print(f"Título genérico o poco descriptivo detectado: {title.text}")
         else:
-            print(f"Título descriptivo adecuado: {title.text}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Título descriptivo adecuado: {title.text}")
+            #print(f"Título descriptivo adecuado: {title.text}")
 
     # Análisis de subtítulos
     for subtitle in subtitles:
         subtitle_length = len(subtitle.text)
         if subtitle_length > title_threshold:
-            print(f"Subtítulo largo detectado: {subtitle.text} (longitud: {subtitle_length} caracteres).")
-        elif not is_descriptive(subtitle.text):
-            print(f"Subtítulo genérico o poco descriptivo detectado: {subtitle.text}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Subtítulo largo detectado: {subtitle.text} (longitud: {subtitle_length} caracteres).")
+            #print(f"Subtítulo largo detectado: {subtitle.text} (longitud: {subtitle_length} caracteres).")
+        elif not is_descriptive(subtitle.text) or subtitle.text != ' ' or subtitle.text != '':
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Subtítulo genérico o poco descriptivo detectado: {subtitle.text}")
+            #print(f"Subtítulo genérico o poco descriptivo detectado: {subtitle.text}")
         else:
-            print(f"Subtítulo descriptivo adecuado: {subtitle.text}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"Subtítulo descriptivo adecuado: {subtitle.text}")
+            #print(f"Subtítulo descriptivo adecuado: {subtitle.text}")
 
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt="Numeración de Listas:", ln=True, align='L')
     # 34. Detección de Listas Numeradas para Verificar que Comienzan en "1"
     numbered_lists = driver.find_elements(By.CSS_SELECTOR, 'ol')
     for ol in numbered_lists:
         if ol.get_attribute('start') and ol.get_attribute('start') != '1':
-            print(f"Lista numerada que no comienza en 1 detectada: {ol.get_attribute('start')}")
+            pdf.multi_cell(200,10,txt= f"Lista numerada que no comienza en 1 detectada: {ol.get_attribute('start')}")
+            #print(f"Lista numerada que no comienza en 1 detectada: {ol.get_attribute('start')}")
         else:
-            print("Todas las listas numeradas comienzan en 1.")
+            pdf.multi_cell(200,10,txt= "Todas las listas numeradas comienzan en 1.")
+            #print("Todas las listas numeradas comienzan en 1.")
 
     # Cerrar el driver
     driver.quit()
 
 def hdu_seis(url):
 
+    pdf.ln(10)
+    pdf.set_font("Arial", size=11)
+    pdf.multi_cell(200,10,txt= "Calidad del Contenido",align='C')
 
     # Navegar a la URL
     driver.get(url)
@@ -1426,9 +1889,15 @@ def hdu_seis(url):
     # 35. Detección de Listas y Viñetas
     lists = driver.find_elements(By.CSS_SELECTOR, 'ul, ol')
     if lists:
-        print(f"Se encontraron {len(lists)} listas (viñetas o numeradas) en la página.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= f"- Se encontraron {len(lists)} listas (viñetas o numeradas) en la página.")
+        #print(f"Se encontraron {len(lists)} listas (viñetas o numeradas) en la página.")
     else:
-        print("No se encontraron listas en la página, posible uso excesivo de texto narrativo.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- No se encontraron listas en la página, posible uso excesivo de texto narrativo.")
+        #print("No se encontraron listas en la página, posible uso excesivo de texto narrativo.")
 
     # 36. Evaluación de la Jerarquía del Contenido mediante Encabezados (H1, H2, etc.)
     headers = driver.find_elements(By.CSS_SELECTOR, 'h1, h2, h3, h4, h5, h6')
@@ -1439,21 +1908,33 @@ def hdu_seis(url):
             header_text = header.text.strip()
             if header.is_displayed() and header_text:
                 current_level = int(header.tag_name[1])
-                print(f"Encabezado {header.tag_name.upper()} encontrado: {header_text}")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10,txt= f"- Encabezado {header.tag_name.upper()} encontrado: {header_text}")
+                #print(f"Encabezado {header.tag_name.upper()} encontrado: {header_text}")
 
                 # Verificar jerarquía
                 if current_level > last_level + 1:
-                    print(f"Advertencia: El encabezado {header.tag_name.upper()} parece estar fuera de orden jerárquico.")
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200,10,txt= f"- Advertencia: El encabezado {header.tag_name.upper()} parece estar fuera de orden jerárquico.")
+                    #print(f"Advertencia: El encabezado {header.tag_name.upper()} parece estar fuera de orden jerárquico.")
                     hierarchy_correct = False
 
                 last_level = current_level
             else:
-                print(f"Encabezado {header.tag_name.upper()} encontrado, pero está vacío o no es visible.")
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200,10,txt= f"- Encabezado {header.tag_name.upper()} encontrado, pero está vacío o no es visible.")
+                #print(f"Encabezado {header.tag_name.upper()} encontrado, pero está vacío o no es visible.")
 
         if hierarchy_correct:
             print("La jerarquía de encabezados está presente y parece correcta.")
         else:
-            print("Se detectaron posibles problemas en la jerarquía de encabezados.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= "- Se detectaron posibles problemas en la jerarquía de encabezados.")
+            #print("Se detectaron posibles problemas en la jerarquía de encabezados.")
     else:
         print("No se encontraron encabezados, posible falta de estructura jerárquica en el contenido.")
 
@@ -1465,7 +1946,10 @@ def hdu_seis(url):
     if large_titles and subtitles and paragraphs:
         long_paragraphs = [p for p in paragraphs if len(p.text.split()) > 100]  # Umbral de 100 palabras por párrafo
         if long_paragraphs:
-            print(f"Se detectaron {len(long_paragraphs)} párrafos largos. Considera dividirlos para mejorar la legibilidad.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Se detectaron {len(long_paragraphs)} párrafos largos. Considera dividirlos para mejorar la legibilidad.")
+            #print(f"Se detectaron {len(long_paragraphs)} párrafos largos. Considera dividirlos para mejorar la legibilidad.")
         else:
             print("Los párrafos son cortos y adecuados para la legibilidad.")
 
@@ -1482,9 +1966,15 @@ def hdu_seis(url):
     for title in large_titles:
         title_length = len(title.text)
         if title_length > title_threshold:
-            print(f"Título largo detectado: {title.text} (longitud: {title_length} caracteres).")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Título largo detectado: {title.text} (longitud: {title_length} caracteres).")
+            #print(f"Título largo detectado: {title.text} (longitud: {title_length} caracteres).")
         elif not is_descriptive(title.text):
-            print(f"Título genérico o poco descriptivo detectado: {title.text}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Título genérico o poco descriptivo detectado: {title.text}")
+            #print(f"Título genérico o poco descriptivo detectado: {title.text}")
         else:
             print(f"Título descriptivo adecuado: {title.text}")
 
@@ -1492,9 +1982,15 @@ def hdu_seis(url):
     for subtitle in subtitles:
         subtitle_length = len(subtitle.text)
         if subtitle_length > title_threshold:
-            print(f"Subtítulo largo detectado: {subtitle.text} (longitud: {subtitle_length} caracteres).")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Subtítulo largo detectado: {subtitle.text} (longitud: {subtitle_length} caracteres).")
+            #print(f"Subtítulo largo detectado: {subtitle.text} (longitud: {subtitle_length} caracteres).")
         elif not is_descriptive(subtitle.text):
-            print(f"Subtítulo genérico o poco descriptivo detectado: {subtitle.text}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Subtítulo genérico o poco descriptivo detectado: {subtitle.text}")
+            #print(f"Subtítulo genérico o poco descriptivo detectado: {subtitle.text}")
         else:
             print(f"Subtítulo descriptivo adecuado: {subtitle.text}")
 
@@ -1506,6 +2002,12 @@ def hdu_siete(url):
 
     # Navegar a la URL
     driver.get(url)
+    
+    pdf.ln(10)
+
+    pdf.set_font("Arial", size=11)
+
+    pdf.cell(200, 10, txt="Diagramación y Diseño", align='C')
 
     # Funciones auxiliares
     def rgb_or_rgba_to_tuple(color_str):
@@ -1589,95 +2091,164 @@ def hdu_siete(url):
 
     # Imprimir resultados agrupados
     if grouped_results["fuentes"]:
-        print("**Fuentes:**")
+        #print("**Fuentes:**")
         for item in grouped_results["fuentes"]:
-            print(f"- {item}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Fuentes: - {item}")
+            #print(f"- {item}")
 
     if grouped_results["contraste"]:
-        print("\n**Advertencia: Elementos con contraste insuficiente:**")
+        #print("\n**Advertencia: Elementos con contraste insuficiente:**")
         for item in grouped_results["contraste"]:
-            print(f"- {item}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Advertencia: Elementos con contraste insuficiente: - {item}")
+            #print(f"- {item}")
 
     if grouped_results["tamaño_fuente"]:
-        print("\n**Advertencia: Elementos con tamaño de fuente insuficiente:**")
+        #print("\n**Advertencia: Elementos con tamaño de fuente insuficiente:**")
         for item in grouped_results["tamaño_fuente"]:
-            print(f"- {item}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Advertencia: Elementos con tamaño de fuente insuficiente: - {item}")
+            #print(f"- {item}")
 
     if grouped_results["desalineado"]:
-        print("\n**Advertencia: Elementos desalineados:**")
+        #print("\n**Advertencia: Elementos desalineados:**")
         for item in grouped_results["desalineado"]:
-            print(f"- {item}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Advertencia: Elementos desalineados: - {item}")
+            #print(f"- {item}")
 
     if grouped_results["elementos_subrayados"]:
-        print("\n**Advertencia: Enlaces sin indicación visual clara:**")
+        #print("\n**Advertencia: Enlaces sin indicación visual clara:**")
         for item in grouped_results["elementos_subrayados"]:
-            print(f"- {item}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Advertencia: Enlaces sin indicación visual clara: - {item}")
+            #print(f"- {item}")
 
     if grouped_results["elementos_negrita"]:
-        print("\n**Advertencia: Uso de negrita en elementos:**")
+        #print("\n**Advertencia: Uso de negrita en elementos:**")
         for item in grouped_results["elementos_negrita"]:
-            print(f"- {item}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Advertencia: Uso de negrita en elementos: - {item}")
+            #print(f"- {item}")
 
     if grouped_results["otros"]:
-        print("\n**Advertencia: Otros problemas detectados:**")
+        #print("\n**Advertencia: Otros problemas detectados:**")
         for item in grouped_results["otros"]:
-            print(f"- {item}")
-
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Advertencia: Otros problemas detectados: - {item}")
+            #print(f"- {item}")
     # Cerrar el driver
     driver.quit()
 
 def hdu_ocho(url):
-
     # Navegar a la URL
     driver.get(url)
+    
+    pdf.set_font("Arial", size=11)
 
+    pdf.cell(200, 10, txt="Sección de Búsquedas", align='C')
+    pdf.ln(10)
+    
     # 52. Confirmación de Términos de Búsqueda y Opciones de Edición
     try:
         search_terms = driver.find_element(By.CSS_SELECTOR, '.search-terms')
         if search_terms.is_displayed():
-            print(f"Términos de búsqueda mostrados: {search_terms.text}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Términos de búsqueda mostrados: {search_terms.text}")
+            #print(f"Términos de búsqueda mostrados: {search_terms.text}")
             edit_button = driver.find_element(By.CSS_SELECTOR, '.edit-search')
             if edit_button.is_displayed():
                 try:
                     edit_button.click()
-                    print("Opción para editar y reenviar los criterios de búsqueda disponible y funcional.")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt="- Opción para editar y reenviar los criterios de búsqueda disponible y funcional." )
+                    #print("Opción para editar y reenviar los criterios de búsqueda disponible y funcional.")
                 except Exception as e:
-                    print(f"Advertencia: El botón de edición no respondió al clic. Error: {e}")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt=f"- Advertencia: El botón de edición no respondió al clic. Error: {e}" )
+                    #print(f"Advertencia: El botón de edición no respondió al clic. Error: {e}")
         else:
-            print("Advertencia: Los términos de búsqueda no son visibles.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- Advertencia: Los términos de búsqueda no son visibles.")
+            #print("Advertencia: Los términos de búsqueda no son visibles.")
     except NoSuchElementException:
-        print("Los términos de búsqueda no se muestran o no hay opción para editar y reenviar.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(200,10,txt= "- Los términos de búsqueda no se muestran o no hay opción para editar y reenviar.")
+        #print("Los términos de búsqueda no se muestran o no hay opción para editar y reenviar.")
 
     # 53. Evaluación de la Clasificación de Resultados por Relevancia
     try:
         results = driver.find_elements(By.CSS_SELECTOR, '.search-result')
         if results:
             for i, result in enumerate(results):
-                print(f"Resultado {i+1}: {result.text[:50]}...")  # Mostrar parte del resultado para identificar
-            print(f"Resultados clasificados por relevancia: {len(results)} resultados encontrados.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(200,10,txt= f"- Resultado {i+1}: {result.text[:50]}...")
+                #print(f"Resultado {i+1}: {result.text[:50]}...")  # Mostrar parte del resultado para identificar
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Resultados clasificados por relevancia: {len(results)} resultados encontrados.")
+            #print(f"Resultados clasificados por relevancia: {len(results)} resultados encontrados.")
         else:
-            print("No se encontraron resultados clasificados por relevancia.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- No se encontraron resultados clasificados por relevancia.")
+            #print("No se encontraron resultados clasificados por relevancia.")
     except NoSuchElementException:
-        print("No se encontraron resultados clasificados por relevancia.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(200,10,txt= "- No se encontraron resultados clasificados por relevancia.")
+        #print("No se encontraron resultados clasificados por relevancia.")
 
     # 54. Comprobación del Número Total de Resultados y Configuración de Resultados por Página
     try:
         total_results = driver.find_element(By.CSS_SELECTOR, '.total-results')
         if total_results.is_displayed():
-            print(f"Número total de resultados mostrado: {total_results.text}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Número total de resultados mostrado: {total_results.text}")
+            #print(f"Número total de resultados mostrado: {total_results.text}")
             per_page_options = driver.find_element(By.CSS_SELECTOR, '.results-per-page')
             if per_page_options.is_displayed():
                 try:
                     per_page_options.click()
-                    print("Opción para configurar el número de resultados por página disponible y funcional.")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt= "- Opción para configurar el número de resultados por página disponible y funcional.")
+                    #print("Opción para configurar el número de resultados por página disponible y funcional.")
                 except Exception as e:
-                    print(f"Advertencia: La opción para configurar los resultados por página no respondió al clic. Error: {e}")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt= f"- Advertencia: La opción para configurar los resultados por página no respondió al clic. Error: {e}")
+                    #print(f"Advertencia: La opción para configurar los resultados por página no respondió al clic. Error: {e}")
             else:
-                print("Advertencia: La opción para configurar los resultados por página no es visible.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(200,10,txt= "- Advertencia: La opción para configurar los resultados por página no es visible.")
+                #print("Advertencia: La opción para configurar los resultados por página no es visible.")
         else:
-            print("Advertencia: El número total de resultados no es visible.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- Advertencia: El número total de resultados no es visible.")
+            #print("Advertencia: El número total de resultados no es visible.")
     except NoSuchElementException:
-        print("No se muestra el número total de resultados o no hay opción para configurar los resultados por página.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(200,10,txt= ("- No se muestra el número total de resultados o no hay opción para configurar los resultados por página."))
+        #print("No se muestra el número total de resultados o no hay opción para configurar los resultados por página.")
 
     # 55. Verificación del Manejo Correcto de Búsquedas sin Entrada
     try:
@@ -1691,22 +2262,40 @@ def hdu_ocho(url):
         # Verificar el comportamiento al realizar una búsqueda sin entrada
         empty_search_results = driver.find_element(By.CSS_SELECTOR, '.no-results, .empty-search')
         if empty_search_results.is_displayed():
-            print("El motor de búsqueda maneja correctamente las búsquedas sin entrada, mostrando un mensaje adecuado.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- El motor de búsqueda maneja correctamente las búsquedas sin entrada, mostrando un mensaje adecuado.")
+            #print("El motor de búsqueda maneja correctamente las búsquedas sin entrada, mostrando un mensaje adecuado.")
         else:
-            print("Advertencia: El motor de búsqueda no maneja adecuadamente las búsquedas sin entrada.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- Advertencia: El motor de búsqueda no maneja adecuadamente las búsquedas sin entrada.")
+            #print("Advertencia: El motor de búsqueda no maneja adecuadamente las búsquedas sin entrada.")
     except NoSuchElementException:
-        print("El motor de búsqueda no maneja correctamente las búsquedas sin entrada o elementos no encontrados.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(200,10,txt= "- El motor de búsqueda no maneja correctamente las búsquedas sin entrada o elementos no encontrados.")
+        #print("El motor de búsqueda no maneja correctamente las búsquedas sin entrada o elementos no encontrados.")
 
     # 56. Comprobación del Etiquetado Claro de la Caja de Búsqueda y Controles
     try:
         search_box_label = driver.find_element(By.CSS_SELECTOR, 'label[for="search-box"], [aria-label="search"]')
 
         if search_box_label.is_displayed():
-            print(f"Caja de búsqueda claramente etiquetada: {search_box_label.text or search_box_label.get_attribute('aria-label')}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Caja de búsqueda claramente etiquetada: {search_box_label.text or search_box_label.get_attribute('aria-label')}")
+            #print(f"Caja de búsqueda claramente etiquetada: {search_box_label.text or search_box_label.get_attribute('aria-label')}")
         else:
-            print("Advertencia: La etiqueta de la caja de búsqueda no es visible.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- Advertencia: La etiqueta de la caja de búsqueda no es visible.")
+            #print("Advertencia: La etiqueta de la caja de búsqueda no es visible.")
     except NoSuchElementException:
-        print("La caja de búsqueda o sus controles no están claramente etiquetados.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(200,10,txt= "- La caja de búsqueda o sus controles no están claramente etiquetados.")
+        #print("La caja de búsqueda o sus controles no están claramente etiquetados.")
 
     # 57. Verificación de Opciones para Encontrar Contenido Relacionado
     try:
@@ -1714,11 +2303,19 @@ def hdu_ocho(url):
 
         if related_content.is_displayed():
             related_links = related_content.find_elements(By.TAG_NAME, 'a')
-            print(f"Opciones para encontrar contenido relacionado disponibles: {len(related_links)} enlaces encontrados.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Opciones para encontrar contenido relacionado disponibles: {len(related_links)} enlaces encontrados.")
+            #print(f"Opciones para encontrar contenido relacionado disponibles: {len(related_links)} enlaces encontrados.")
         else:
-            print("Advertencia: Las opciones para encontrar contenido relacionado no son visibles.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- Advertencia: Las opciones para encontrar contenido relacionado no son visibles.")
+            #print("Advertencia: Las opciones para encontrar contenido relacionado no son visibles.")
     except NoSuchElementException:
-        print("No se ofrecen opciones para encontrar contenido relacionado.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(200,10,"No se ofrecen opciones para encontrar contenido relacionado (Si es sitio de comercio omitir sugerencia).")
 
     # 58. Evaluación de Opciones de Navegación y Búsqueda
     try:
@@ -1726,11 +2323,19 @@ def hdu_ocho(url):
         search_box = driver.find_element(By.CSS_SELECTOR, '.search-box')
 
         if navigation_menu.is_displayed() and search_box.is_displayed():
-            print("El sitio ofrece opciones tanto para la navegación como para la búsqueda.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- El sitio ofrece opciones tanto para la navegación como para la búsqueda.")
+            #print("El sitio ofrece opciones tanto para la navegación como para la búsqueda.")
         else:
-            print("Advertencia: Las opciones de navegación o búsqueda no son visibles.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- Advertencia: Las opciones de navegación o búsqueda no son visibles.")
+            #print("Advertencia: Las opciones de navegación o búsqueda no son visibles.")
     except NoSuchElementException:
-        print("El sitio no ofrece opciones adecuadas para la navegación o la búsqueda.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(200,10,"- El sitio no ofrece opciones adecuadas para la navegación o la búsqueda o el elemento no fue encontrado.")
 
     # 59. Verificación de la Ausencia de Resultados Duplicados o Similares
     try:
@@ -1738,16 +2343,27 @@ def hdu_ocho(url):
         duplicates = [title for title in result_titles if result_titles.count(title) > 1]
 
         if duplicates:
-            print(f"Advertencia: Resultados duplicados encontrados: {', '.join(set(duplicates))}")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= f"- Advertencia: Resultados duplicados encontrados: {', '.join(set(duplicates))}")
+            #print(f"Advertencia: Resultados duplicados encontrados: {', '.join(set(duplicates))}")
         else:
-            print("No se encontraron resultados duplicados o muy similares.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt= "- No se encontraron resultados duplicados o muy similares.")
+            #print("No se encontraron resultados duplicados o muy similares.")
     except NoSuchElementException:
         print("No se pudo verificar la existencia de resultados duplicados o similares.")
 
     # Cerrar el driver
     driver.quit()
 
+
 def hdu_nueve(url):
+    
+    pdf.ln(10)
+    pdf.set_font("Arial", size=11)
+    pdf.cell(200, 10, txt="Sección de Reconocimiento de Errores y Retroalimentación", align='C')
     # Configurar Selenium con Chrome en modo headless
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -1764,9 +2380,15 @@ def hdu_nueve(url):
     driver.get(url)
     load_time = time.time() - start_time
     if load_time <= 5:
-        print(f"La página se cargó en {load_time:.2f} segundos, dentro del límite aceptable.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(200,10,txt= f"La página se cargó en {load_time:.2f} segundos, dentro del límite aceptable.")
+        #print(f"La página se cargó en {load_time:.2f} segundos, dentro del límite aceptable.")
     else:
-        print(f"Advertencia: La página tardó {load_time:.2f} segundos en cargar, excediendo el límite de 5 segundos.")
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(200,10,txt= f"Advertencia: La página tardó {load_time:.2f} segundos en cargar, excediendo el límite de 5 segundos.")
+        #print(f"Advertencia: La página tardó {load_time:.2f} segundos en cargar, excediendo el límite de 5 segundos.")
 
     # Lista para almacenar mensajes ya mostrados
     shown_messages = []
@@ -1791,10 +2413,16 @@ def hdu_nueve(url):
         search_box_width = search_box.size['width']
 
         if search_box_width >= 300:
-            show_message(f"La caja de búsqueda es lo suficientemente grande: {search_box_width}px de ancho.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt=f"- La caja de búsqueda es lo suficientemente grande: {search_box_width}px de ancho.")
+            #show_message(f"La caja de búsqueda es lo suficientemente grande: {search_box_width}px de ancho.")
             save_screenshot(search_box, 'caja_busqueda')
         else:
-            show_message(f"Advertencia: La caja de búsqueda es pequeña: {search_box_width}px de ancho.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt=f"- Advertencia: La caja de búsqueda es pequeña: {search_box_width}px de ancho.")
+            #show_message(f"Advertencia: La caja de búsqueda es pequeña: {search_box_width}px de ancho.")
             save_screenshot(search_box, 'caja_busqueda_pequena')
     except NoSuchElementException:
         show_message("No se pudo encontrar la caja de búsqueda para verificar su tamaño.")
@@ -1808,10 +2436,16 @@ def hdu_nueve(url):
                 size = elem.size
                 location = elem.location
                 if size['width'] >= 44 and size['height'] >= 44:
-                    show_message(f"Elemento clickeable de tamaño adecuado: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt=f"- Elemento clickeable de tamaño adecuado: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
+                    #show_message(f"Elemento clickeable de tamaño adecuado: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
                     save_screenshot(elem, f'elemento_clickeable_{elem_id}')
                 else:
-                    show_message(f"Advertencia: Elemento clickeable pequeño: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt=f"- Advertencia: Elemento clickeable pequeño: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
+                    #show_message(f"Advertencia: Elemento clickeable pequeño: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
                     save_screenshot(elem, f'elemento_clickeable_pequeno_{elem_id}')
 
                 # Verificación de espaciado alrededor
@@ -1819,27 +2453,45 @@ def hdu_nueve(url):
                 for nearby_elem in elements_around:
                     nearby_location = nearby_elem.location
                     if abs(location['x'] - nearby_location['x']) < 20 and abs(location['y'] - nearby_location['y']) < 20:
-                        show_message(f"Advertencia: Elemento clickeable {elem.tag_name} podría tener un espaciado insuficiente.")
+                        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                        pdf.multi_cell(200,10,txt=f"- Advertencia: Elemento clickeable {elem.tag_name} podría tener un espaciado insuficiente.")
+                        #show_message(f"Advertencia: Elemento clickeable {elem.tag_name} podría tener un espaciado insuficiente.")
                         save_screenshot(nearby_elem, f'elemento_cercano_{elem_id}')
         except StaleElementReferenceException:
-            show_message(f"Advertencia: El elemento '{elem.tag_name}' ya no es válido en el DOM.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt=f"- Advertencia: El elemento '{elem.tag_name}' ya no es válido en el DOM.")
+            #show_message(f"Advertencia: El elemento '{elem.tag_name}' ya no es válido en el DOM.")
 
     # 63. Verificación de la Presencia y Adecuación de la Ayuda Contextual
     try:
         help_elements = driver.find_elements(By.CSS_SELECTOR, '.help, .tooltip, .hint, [title], [aria-label]')
         if help_elements:
-            show_message(f"Se encontraron {len(help_elements)} elementos de ayuda contextual visibles.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt=f"- Se encontraron {len(help_elements)} elementos de ayuda contextual visibles.")
+            #show_message(f"Se encontraron {len(help_elements)} elementos de ayuda contextual visibles.")
             for elem in help_elements:
                 try:
                     elem_id = elem.get_attribute('title') or elem.get_attribute('aria-label') or elem.text
                     if elem_id:
-                        show_message(f"Elemento de ayuda detectado: {elem_id}")
+                        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                        pdf.multi_cell(200,10,txt=f"- Elemento de ayuda detectado: {elem_id}")
+                        #show_message(f"Elemento de ayuda detectado: {elem_id}")
                         save_screenshot(elem, f'elemento_ayuda_{elem_id}')
                         elem.click()  # Intentamos interactuar con el elemento.
                 except StaleElementReferenceException:
-                    show_message(f"Advertencia: El elemento de ayuda '{elem_id}' ya no es válido en el DOM.")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt=f"- Advertencia: El elemento de ayuda '{elem_id}' ya no es válido en el DOM.")
+                    #show_message(f"Advertencia: El elemento de ayuda '{elem_id}' ya no es válido en el DOM.")
                 except Exception as e:
-                    show_message(f"Advertencia: Error interactuando con el elemento '{elem_id}'. Error: {e}")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt=f"- Advertencia: Error interactuando con el elemento '{elem_id}'. Error: {e}")
+                    #show_message(f"Advertencia: Error interactuando con el elemento '{elem_id}'. Error: {e}")
         else:
             show_message("No se encontró ayuda contextual visible en la página.")
     except NoSuchElementException:
@@ -1853,27 +2505,42 @@ def hdu_nueve(url):
         try:
             link_text = link.text.strip()
             if not link_text:
-                show_message("Advertencia: Enlace sin texto visible o solo con espacios detectado.")
+                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                pdf.multi_cell(200,10,txt="- Advertencia: Enlace sin texto visible o solo con espacios detectado.")
+                #show_message("Advertencia: Enlace sin texto visible o solo con espacios detectado.")
             else:
                 if any(phrase.lower() in link_text.lower() for phrase in generic_phrases):
-                    show_message(f"Advertencia: Enlace con texto genérico encontrado: {link_text}")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt=f"- Advertencia: Enlace con texto genérico encontrado: {link_text}")
+                    #show_message(f"Advertencia: Enlace con texto genérico encontrado: {link_text}")
                     save_screenshot(link, f'enlace_generico_{link_text}')
                 else:
-                    show_message(f"Enlace con texto descriptivo adecuado: {link_text}")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt=f"- Enlace con texto descriptivo adecuado: {link_text}")
+                    #show_message(f"Enlace con texto descriptivo adecuado: {link_text}")
                     save_screenshot(link, f'enlace_descriptivo_{link_text}')
 
                 title_attr = link.get_attribute('title')
                 aria_label = link.get_attribute('aria-label')
                 if title_attr or aria_label:
-                    show_message(f"Enlace mejorado con atributo de accesibilidad: title='{title_attr}', aria-label='{aria_label}'")
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+                    pdf.multi_cell(200,10,txt=f"- Enlace mejorado con atributo de accesibilidad: title='{title_attr}', aria-label='{aria_label}'")
+                    #show_message(f"Enlace mejorado con atributo de accesibilidad: title='{title_attr}', aria-label='{aria_label}'")
         except StaleElementReferenceException:
-            show_message(f"Advertencia: El enlace '{link.text}' ya no es válido en el DOM.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(200,10,txt=f"- Advertencia: El enlace '{link.text}' ya no es válido en el DOM.")
+            #show_message(f"Advertencia: El enlace '{link.text}' ya no es válido en el DOM.")
 
     # Cerrar el driver
     driver.quit()
 
 for categoria in categorias:
-    if categoria == "Pagina de Inicio":
+    if categoria == "Página de Inicio":
         hdu_uno(url)
     elif categoria == "Orientación de Tareas":
         hdu_dos(url)
@@ -1893,3 +2560,4 @@ for categoria in categorias:
         hdu_nueve(url)
 
 driver.quit()
+pdf.output(f"public/informe.pdf")
