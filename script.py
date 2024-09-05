@@ -27,6 +27,9 @@ from collections import defaultdict
 from spellchecker import SpellChecker
 
 pdf = FPDF()
+pdf.add_page()
+pdf.set_font("Arial",size=12)
+pdf.multicell(200,10,txt= "Revisión de Criterios de Usabilidad Web", ln=True,align='C')
 
 output_folder = "output_images"
 if not os.path.exists(output_folder):
