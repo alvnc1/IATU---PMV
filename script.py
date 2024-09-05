@@ -1614,6 +1614,16 @@ def hdu_cuatro(url):
     driver.quit
     
     
+def is_element_displayed_safely(element, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            # Verificar si el elemento está visible
+            return element.is_displayed()
+        except StaleElementReferenceException:
+            # Si ocurre un error de referencia obsoleta, esperar y reintentar
+            time.sleep(0.5)
+    return False  # Si no se puede verificar después de varios intentos, retornar False
+    
 def hdu_cinco(url): 
 
     pdf.ln(10)
