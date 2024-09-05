@@ -1,0 +1,12 @@
+Bounding Box 2:
+ - Clase: button
+ - Confianza: 0.84
+ - Dimensiones: 102x17 píxeles
+ - Área de la bounding box: 1734 píxeles cuadrados
+ - Relación de aspecto: 6.00
+ - Centro de la bounding box: (436.0, 477.5)
+ - Cobertura en la imagen original: 0.19%
+ - Brillo promedio: 209.92
+ - Contraste: 136
+ - Desviación estándar del brillo: 37.68
+ - Perímetro de la bounding box: 238 píxeles

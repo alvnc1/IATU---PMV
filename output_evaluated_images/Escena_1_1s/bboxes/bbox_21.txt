@@ -1,0 +1,12 @@
+Bounding Box 21:
+ - Clase: image
+ - Confianza: 0.56
+ - Dimensiones: 62x95 píxeles
+ - Área de la bounding box: 5890 píxeles cuadrados
+ - Relación de aspecto: 0.65
+ - Centro de la bounding box: (914.0, 149.5)
+ - Cobertura en la imagen original: 0.64%
+ - Brillo promedio: 122.20
+ - Contraste: 249
+ - Desviación estándar del brillo: 76.10
+ - Perímetro de la bounding box: 314 píxeles

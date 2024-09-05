@@ -1,0 +1,12 @@
+Bounding Box 16:
+ - Clase: image
+ - Confianza: 0.86
+ - Dimensiones: 64x72 píxeles
+ - Área de la bounding box: 4608 píxeles cuadrados
+ - Relación de aspecto: 0.89
+ - Centro de la bounding box: (302.0, 376.0)
+ - Cobertura en la imagen original: 0.50%
+ - Brillo promedio: 228.09
+ - Contraste: 212
+ - Desviación estándar del brillo: 45.38
+ - Perímetro de la bounding box: 272 píxeles

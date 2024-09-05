@@ -1,0 +1,12 @@
+Bounding Box 5:
+ - Clase: label
+ - Confianza: 0.52
+ - Dimensiones: 56x24 píxeles
+ - Área de la bounding box: 1344 píxeles cuadrados
+ - Relación de aspecto: 2.33
+ - Centro de la bounding box: (306.0, 19.0)
+ - Cobertura en la imagen original: 0.15%
+ - Brillo promedio: 154.46
+ - Contraste: 223
+ - Desviación estándar del brillo: 66.49
+ - Perímetro de la bounding box: 160 píxeles

@@ -1,0 +1,12 @@
+Bounding Box 4:
+ - Clase: input
+ - Confianza: 0.71
+ - Dimensiones: 183x35 píxeles
+ - Área de la bounding box: 6405 píxeles cuadrados
+ - Relación de aspecto: 5.23
+ - Centro de la bounding box: (916.5, 582.5)
+ - Cobertura en la imagen original: 0.69%
+ - Brillo promedio: 239.95
+ - Contraste: 163
+ - Desviación estándar del brillo: 36.14
+ - Perímetro de la bounding box: 436 píxeles

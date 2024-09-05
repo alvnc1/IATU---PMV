@@ -1,0 +1,12 @@
+Bounding Box 18:
+ - Clase: image
+ - Confianza: 0.84
+ - Dimensiones: 68x60 píxeles
+ - Área de la bounding box: 4080 píxeles cuadrados
+ - Relación de aspecto: 1.13
+ - Centro de la bounding box: (969.0, 377.0)
+ - Cobertura en la imagen original: 0.44%
+ - Brillo promedio: 219.93
+ - Contraste: 255
+ - Desviación estándar del brillo: 57.30
+ - Perímetro de la bounding box: 256 píxeles

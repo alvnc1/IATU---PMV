@@ -1,0 +1,12 @@
+Bounding Box 1:
+ - Clase: switch
+ - Confianza: 0.71
+ - Dimensiones: 25x15 píxeles
+ - Área de la bounding box: 375 píxeles cuadrados
+ - Relación de aspecto: 1.67
+ - Centro de la bounding box: (374.5, 206.5)
+ - Cobertura en la imagen original: 0.04%
+ - Brillo promedio: 212.57
+ - Contraste: 105
+ - Desviación estándar del brillo: 42.73
+ - Perímetro de la bounding box: 80 píxeles

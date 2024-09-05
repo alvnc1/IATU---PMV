@@ -50,7 +50,7 @@
 }
 
 .play-button:hover {
-  background-color: #d4edda;
+  background-color: transparent;
   border-radius: 50%;
 }
 
@@ -70,7 +70,7 @@
 }
 
 .delete-button:hover {
-  background-color: #f8d7da;
+  background-color: transparent;
   border-radius: 50%;
 }
 
@@ -117,3 +117,50 @@
   color: white !important; /* Cambia el color del texto */
   box-shadow: none !important; /* Elimina el resplandor de enfoque */
 }
+
+
+.progress-bar-container {
+  width: 80%; /* Ajusta el ancho relativo al contenedor */
+  background-color: transparent;
+  border: 2px solid #333333; /* Color del borde */
+  border-radius: 40px; /* Redondear los bordes */
+  height: 30px; /* Ajusta la altura de la barra */
+  overflow: hidden;
+  position: fixed;
+  bottom: 20px; /* Ajuste para separarlo un poco del fondo */
+  left: 55%; /* Coloca el contenedor en el centro */
+  transform: translateX(-50%); /* Centra la barra horizontalmente */
+}
+
+.progress-bar {
+  background-color: #333333; /* Color de relleno */
+  height: 100%;
+  width: 0%; /* Comienza en 0 y crecerá */
+  border-radius: 40px; /* Redondeado del relleno para coincidir con el contenedor */
+  transition: width 1.5s ease; /* Animación suave para el progreso */
+}
+
+.progress-bar-text {
+  color: #000000;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+}
+
+@keyframes progress-animation {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+.table-header {
+  font-weight: bold;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+

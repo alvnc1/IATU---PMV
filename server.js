@@ -1,10 +1,10 @@
 const express = require('express');
-const cors = require('cors'); // Importa el paquete CORS
+const cors = require('cors');
 const { spawn } = require('child_process');
 const app = express();
 const port = 3001;
 
-// Configurar CORS para permitir solicitudes desde http://localhost:3000
+// Configurar CORS para permitir solicitudes
 app.use(cors({
   origin: 'http://localhost:3000'  // Aquí defines qué origen está permitido
 }));
@@ -12,13 +12,17 @@ app.use(cors({
 app.use(express.json());
 
 app.post('/run-python', (req, res) => {
-    const { videoUrl } = req.body;
+    const { videoUrl, urlTarea, categorias } = req.body;
 
-    if (!videoUrl) {
-        return res.status(400).json({ error: 'Video URL is required' });
+    if (!videoUrl || !urlTarea || !categorias) {
+        return res.status(400).json({ error: 'Video URL, URL de la Tarea y Categorías son requeridos' });
     }
 
-    const pythonProcess = spawn('python', ['frameCapture.py', videoUrl]);
+    // Log para ver los datos recibidos
+    console.log(`Datos recibidos - videoUrl: ${videoUrl}, urlTarea: ${urlTarea}, categorias: ${categorias}`);
+
+    // Ejecutar el proceso de Python
+    const pythonProcess = spawn('python', ['script.py', videoUrl,urlTarea,categorias]);
 
     pythonProcess.stdout.on('data', (data) => {
         console.log(`stdout: ${data}`);

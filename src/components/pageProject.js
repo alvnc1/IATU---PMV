@@ -19,6 +19,7 @@ function ProjectPage() {
   const [sortOrder, setSortOrder] = useState('asc');
   const [testStatus, setTestStatus] = useState({});
   const [projectName, setProjectName] = useState(''); 
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const getProjectDetails = async () => {
@@ -46,6 +47,12 @@ function ProjectPage() {
       }
     });
     setTasks(tasksList);
+
+    const initialStatus = {};
+    tasksList.forEach(task => {
+      initialStatus[task.id] = testStatus[task.id] || 'Pendiente';
+    });
+    setTestStatus(initialStatus);
   };
 
   const deleteTask = async (taskId) => {
@@ -73,23 +80,55 @@ function ProjectPage() {
     navigate(`/newTask/${id}`);
   };
 
-  const handlePlayTask = (task) => {
-    const videoUrl = task.files.find(file => file.url).url;
+  const handlePlayTask = (taskId) => {
+    setIsLoading(true);
+
+    const videoUrl = taskId.files.find(file => file.url).url;
+    const urlTarea = taskId.urlTarea;
+    const categorias = taskId.categorias;
+    console.log(videoUrl);
+    console.log(urlTarea);
+    console.log(categorias);
+
+    // Verificar que todos los valores están presentes
+    if (!videoUrl || !urlTarea || !categorias) {
+      setIsLoading(false);
+      return alert('Faltan datos para ejecutar el análisis');
+    }
+
+    setTestStatus(prevStatus => ({
+      ...prevStatus,
+      [taskId.id]: 'Ejecutando'
+    }));
 
     fetch('http://localhost:3001/run-python', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ videoUrl })
+      body: JSON.stringify({ videoUrl, urlTarea, categorias })
     })
     .then(response => response.json())
     .then(data => {
       console.log('Respuesta del servidor:', data);
-      alert('Análisis de video completado');
+      //alert('Análisis de video completado');
+
+      setTestStatus(prevStatus => ({
+        ...prevStatus,
+        [taskId.id]: 'Finalizado'
+      }));
     })
     .catch(error => {
-      alert('Error al analizar el video');
+      console.error('Error al ejecutar el script de Python:', error);
+      //alert('Error al analizar el video');
+
+      setTestStatus(prevStatus => ({
+        ...prevStatus,
+        [taskId.id]: 'Error'
+      }));
+    })
+    .finally(() => {
+      setIsLoading(false);
     });
   };
 
@@ -109,6 +148,15 @@ function ProjectPage() {
             Agregar
           </Button>
         </div>
+
+        {isLoading && (
+          <div className="progress-bar-container">
+            <div className="progress-bar">
+              <span className="progress-bar-text">Cargando...</span>
+            </div>
+          </div>
+        )}
+
         <div style={{ marginTop: '20px' }}>
           <Table striped bordered hover responsive className="rounded-table">
             <thead>
@@ -125,7 +173,7 @@ function ProjectPage() {
                 <tr key={task.id}>
                   <td className="text-truncate">{task.nombreTarea}</td>
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
-                  <td>-</td>
+                  <td>{testStatus[task.id] || 'Pendiente'}</td>
                   <td>
                     <Button 
                     variant="outline-primary"

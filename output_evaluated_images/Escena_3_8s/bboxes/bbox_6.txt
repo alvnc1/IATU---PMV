@@ -1,0 +1,12 @@
+Bounding Box 6:
+ - Clase: label
+ - Confianza: 0.43
+ - Dimensiones: 45x14 píxeles
+ - Área de la bounding box: 630 píxeles cuadrados
+ - Relación de aspecto: 3.21
+ - Centro de la bounding box: (946.5, 53.0)
+ - Cobertura en la imagen original: 0.07%
+ - Brillo promedio: 184.16
+ - Contraste: 216
+ - Desviación estándar del brillo: 41.39
+ - Perímetro de la bounding box: 118 píxeles

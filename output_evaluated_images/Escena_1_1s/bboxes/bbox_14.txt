@@ -1,0 +1,12 @@
+Bounding Box 14:
+ - Clase: image
+ - Confianza: 0.87
+ - Dimensiones: 97x113 píxeles
+ - Área de la bounding box: 10961 píxeles cuadrados
+ - Relación de aspecto: 0.86
+ - Centro de la bounding box: (441.5, 557.5)
+ - Cobertura en la imagen original: 1.19%
+ - Brillo promedio: 206.53
+ - Contraste: 255
+ - Desviación estándar del brillo: 74.81
+ - Perímetro de la bounding box: 420 píxeles

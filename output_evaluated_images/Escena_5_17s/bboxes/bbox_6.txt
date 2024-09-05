@@ -1,0 +1,12 @@
+Bounding Box 6:
+ - Clase: input
+ - Confianza: 0.58
+ - Dimensiones: 394x27 píxeles
+ - Área de la bounding box: 10638 píxeles cuadrados
+ - Relación de aspecto: 14.59
+ - Centro de la bounding box: (559.0, 18.5)
+ - Cobertura en la imagen original: 1.15%
+ - Brillo promedio: 239.36
+ - Contraste: 133
+ - Desviación estándar del brillo: 35.91
+ - Perímetro de la bounding box: 842 píxeles

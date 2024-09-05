@@ -1,15 +1,17 @@
-# Configurar el entorno para que Chrome se ejecute en modo headless
+import cv2
 import os
-os.environ['PATH'] += ":/usr/lib/chromium-browser/"
+import sys
+from fpdf import FPDF
+from scenedetect import open_video, SceneManager
+from scenedetect.detectors import ContentDetector
+from IPython.display import display, Image
+import subprocess
+from inference_sdk import InferenceHTTPClient
+from dataclasses import dataclass
 
-# Importar las librerías necesarias
 from requests_html import AsyncHTMLSession
-import nest_asyncio
-import asyncio
-import colorsys
 import time
 import re
-import requests
 import spacy
 from PIL import Image
 from io import BytesIO
@@ -24,51 +26,191 @@ from urllib.parse import urlparse
 from collections import defaultdict
 from spellchecker import SpellChecker
 
+pdf = FPDF()
+
+output_folder = "output_images"
+if not os.path.exists(output_folder):
+    os.makedirs(output_folder)
+
+# Obtener la ruta del video desde los argumentos de la línea de comandos
+video_path = sys.argv[1]
+url = sys.argv[2]
+categorias = sys.argv[3].split(',')
+
+print(video_path)
+print(url)
+print(categorias[0])
+
+# Crear una carpeta para guardar las capturas si no existe
+output_dir = 'capturas'
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+
+# Abrir el video con la función moderna de scenedetect
+video = open_video(video_path)
+
+# Crear un SceneManager y añadir un detector de contenido
+scene_manager = SceneManager()
+scene_manager.add_detector(ContentDetector(threshold=30.0))  # Ajusta el umbral si es necesario
+
+# Detectar escenas en el video
+scene_manager.detect_scenes(video)
+
+# Obtener la lista de escenas detectadas
+scene_list = scene_manager.get_scene_list()
+
+print(f"Detectadas {len(scene_list)} escenas.")
+
+# Cargar el video con OpenCV para capturar fotogramas
+cap = cv2.VideoCapture(video_path)
+fps = cap.get(cv2.CAP_PROP_FPS)  # Obtener los FPS del video
+
+for i, scene in enumerate(scene_list):
+    start_frame, end_frame = scene[0].get_frames(), scene[1].get_frames()
+    timestamp = scene[0].get_seconds()
+
+    # Calcular el número de fotogramas a avanzar para capturar el fotograma 1.5 segundos después
+    frames_to_advance = int(fps * 1.5)
+    new_frame_position = start_frame + frames_to_advance
+
+    # Mover el puntero del video al nuevo fotograma (1.5 segundos después)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame_position)
+
+    # Leer y guardar el fotograma 1.5 segundos después del cambio de escena
+    ret, frame = cap.read()
+    if ret:
+        filename = os.path.join(output_dir, f"Escena_{i + 1}_{int(timestamp + 1.5)}s.png")
+        cv2.imwrite(filename, frame)
+        print(f"Guardado {filename}")
+
+cap.release()
 
 
-# Aplicar parche al bucle de eventos existente
-nest_asyncio.apply()
+CLIENT = InferenceHTTPClient(
+    api_url="https://detect.roboflow.com",
+    api_key="FCbLovxwSDWFYTwaMuQi"
+)
+# Directorio con las imágenes de entrada
+input_dir = "capturas"  # Cambia esta ruta a la ubicación de tu directorio de imágenes
+output_base_dir = "output_evaluated_images"  # Directorio base para guardar los resultados
+os.makedirs(output_base_dir, exist_ok=True)
 
-# Crear una sesión asíncrona HTML
-asession = AsyncHTMLSession()
+dic_clases = {}
+@dataclass
+class Elemento:
+  cantidad: int = 0
+  confianza_promedio: float = 0.0
+  cobertura_promedio: float = 0.0
+# Procesar cada imagen en el directorio de entrada
+for image_filename in os.listdir(input_dir):
+    if image_filename.endswith(('.jpg', '.jpeg', '.png')):  # Filtrar solo las imágenes
+        image_path = os.path.join(input_dir, image_filename)
 
-# Función para obtener y renderizar la página
-async def get_page(url):
-    response = await asession.get(url)
-    await response.html.arender(sleep=5, timeout=60)  # Aumentar tiempo de espera si es necesario
-    return response
+        # Realizar la inferencia en la imagen
+        result = CLIENT.infer(image_path, model_id="cingoz8/1")
+        result_model_2 = CLIENT.infer(image_path, model_id="app-icon/45")
 
-def rgb_or_rgba_to_tuple(color_str):
-    # Remover 'rgb(' o 'rgba(' y cerrar paréntesis
-    color_str = color_str.replace('rgb(', '').replace('rgba(', '').replace(')', '')
-    # Dividir los valores y convertirlos a enteros
-    color_tuple = tuple(int(c) for c in color_str.split(',')[:3])  # Tomar solo los primeros tres valores
-    return color_tuple
+        filtered_results_model_1 = [pred for pred in result['predictions'] if pred['class'] != 'icon']
+        combined_results = filtered_results_model_1 + result_model_2['predictions']
 
-def calculate_contrast(color1, color2):
-    # Calcular la luminancia relativa para ambos colores
-    l1 = colorsys.rgb_to_hls(*color1)[1]
-    l2 = colorsys.rgb_to_hls(*color2)[1]
-    return abs(l1 - l2)
+        # Crear un subdirectorio específico para esta imagen en la salida
+        image_output_dir = os.path.join(output_base_dir, os.path.splitext(image_filename)[0])
+        os.makedirs(image_output_dir, exist_ok=True)
 
-#----------------------------------------------------------------
-# Función principal para realizar análisis de la página
+        # Crear subdirectorios para las bounding boxes y los archivos de texto
+        bboxes_dir = os.path.join(image_output_dir, "bboxes")
+        os.makedirs(bboxes_dir, exist_ok=True)
+
+        # Cargar la imagen usando OpenCV
+        image = cv2.imread(image_path)
+        original_height, original_width, _ = image.shape
+
+        # Procesar los resultados y guardar cada bounding box como una imagen separada y sus propiedades
+        for i, prediction in enumerate(combined_results):
+            if prediction['class'] == "icon": #NO SE CONSIDERAN LOS ICONOS PARA ESTE MODELO YA QUE APP-ICON EN MEJOR
+              continue
+            # Extraer las coordenadas y el tamaño de la bounding box
+            x0 = int(prediction['x'] - prediction['width'] / 2)
+            y0 = int(prediction['y'] - prediction['height'] / 2)
+            x1 = int(prediction['x'] + prediction['width'] / 2)
+            y1 = int(prediction['y'] + prediction['height'] / 2)
+
+            # Dibujar la bounding box en la imagen original
+            cv2.rectangle(image, (x0, y0), (x1, y1), color=(0, 255, 0), thickness=2)
+
+            # Poner el label encima de la bounding box
+            label = f"{prediction['class']} ({prediction['confidence']:.2f})"
+            cv2.putText(image, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            # Recortar la región de la bounding box para guardarla como imagen separada
+            cropped_image = image[y0:y1, x0:x1]
+
+            # Generar el nombre de archivo para la imagen recortada
+            output_image_name = f"bbox_{i+1}.jpg"
+            output_image_path = os.path.join(bboxes_dir, output_image_name)
+
+            # Guardar la imagen recortada
+            cv2.imwrite(output_image_path, cropped_image)
+
+            # Obtener propiedades adicionales
+            bbox_width = x1 - x0
+            bbox_height = y1 - y0
+            bbox_area = bbox_width * bbox_height
+            aspect_ratio = bbox_width / bbox_height
+            center_x = (x0 + x1) / 2
+            center_y = (y0 + y1) / 2
+            coverage_percentage = (bbox_area / (original_width * original_height)) * 100
+            gray_image = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
+            average_brightness = gray_image.mean()
+            contrast = gray_image.max() - gray_image.min()
+            std_dev_brightness = gray_image.std()
+            perimeter = 2 * (bbox_width + bbox_height)
+
+            if prediction['class'] not in dic_clases:
+              dic_clases[prediction['class']] = Elemento()
+            elemento = dic_clases[prediction['class']]
+            elemento.cantidad += 1
+            elemento.confianza_promedio = (elemento.confianza_promedio * (elemento.cantidad - 1) + float(prediction['confidence'])) / elemento.cantidad
+            elemento.cobertura_promedio = (elemento.cobertura_promedio * (elemento.cantidad - 1) + coverage_percentage) / elemento.cantidad
+
+            # Guardar las propiedades en un archivo .txt
+            output_txt_path = os.path.join(bboxes_dir, f"bbox_{i+1}.txt")
+            with open(output_txt_path, 'w') as f:
+                f.write(f"Bounding Box {i+1}:\n")
+                f.write(f" - Clase: {prediction['class']}\n")
+                f.write(f" - Confianza: {prediction['confidence']:.2f}\n")
+                f.write(f" - Dimensiones: {bbox_width}x{bbox_height} píxeles\n")
+                f.write(f" - Área de la bounding box: {bbox_area} píxeles cuadrados\n")
+                f.write(f" - Relación de aspecto: {aspect_ratio:.2f}\n")
+                f.write(f" - Centro de la bounding box: ({center_x}, {center_y})\n")
+                f.write(f" - Cobertura en la imagen original: {coverage_percentage:.2f}%\n")
+                f.write(f" - Brillo promedio: {average_brightness:.2f}\n")
+                f.write(f" - Contraste: {contrast}\n")
+                f.write(f" - Desviación estándar del brillo: {std_dev_brightness:.2f}\n")
+                f.write(f" - Perímetro de la bounding box: {perimeter} píxeles\n")
+
+        # Guardar la imagen original con todas las bounding boxes dibujadas en el directorio de salida
+        output_image_path = os.path.join(image_output_dir, os.path.basename(image_path))
+        cv2.imwrite(output_image_path, image)
+print("Proceso completado para todas las imágenes.")
+
+
+# Configurar Selenium con Chrome
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument("--no-sandbox")
+chrome_options.add_argument("--disable-dev-shm-usage")
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+nlp = spacy.load("en_core_web_md")
+
 def hdu_uno(url):
-    # Extraer componentes usando requests_html
-    response = asyncio.get_event_loop().run_until_complete(get_page(url))
-
-    # --- Criterios de Usabilidad ---
-
-    # 1. Búsqueda de campos de búsqueda con diferentes atributos y validaciones adicionales
-    # Configurar Selenium con Chrome
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-
     # Navegar a la URL
     driver.get(url)
+    
+    # Obtener el contenido de la página renderizada
+    html_content = driver.page_source
+
+    # --- Criterios de Usabilidad ---
 
     # 1. Búsqueda de campos de búsqueda con diferentes atributos y validaciones adicionales
     search_fields = driver.find_elements(By.CSS_SELECTOR, 'input[type="search"], input[name*="search"], input[placeholder*="search"], input[type="text"][name*="search"], input[type="text"][placeholder*="search"], form[action*="search"] input')
@@ -92,7 +234,7 @@ def hdu_uno(url):
             else:
                 # Obtener la posición del campo de búsqueda
                 location = field.location
-                if location['y'] >= 600:  # Supongamos que la cabecera esté en los primeros 600px
+                if location['y'] >= 600:
                     issues.append(f"Ubicación inusual para un campo de búsqueda (posicionada en y={location['y']}).")
 
             # Comprobar si el campo de búsqueda está dentro de un contenedor de cabecera
@@ -110,64 +252,31 @@ def hdu_uno(url):
     else:
         print("Campo de búsqueda NO detectado.")
 
-
-    # Cerrar el driver
-    driver.quit()
-
-
-
     # 2. Verificación de palabras clave en enlaces
-    # Parámetro N: cantidad mínima de veces que una palabra debe aparecer para ser considerada
     N = 3
-
-    # Función para filtrar palabras no vacías y contar su frecuencia
     def obtener_palabras_clave_frecuentes(texto, min_frecuencia):
         palabras = re.findall(r'\b\w+\b', texto.lower())
-        palabras_filtradas = [palabra for palabra in palabras if len(palabra) > 3]  # Filtrar palabras con más de 3 caracteres
+        palabras_filtradas = [palabra for palabra in palabras if len(palabra) > 3]
         contador_palabras = Counter(palabras_filtradas)
-        # Filtrar palabras que aparecen al menos 'min_frecuencia' veces
-        palabras_clave_frecuentes = {palabra: frecuencia for palabra, frecuencia in contador_palabras.items() if frecuencia >= min_frecuencia}
-        return palabras_clave_frecuentes
+        return {palabra: frecuencia for palabra, frecuencia in contador_palabras.items() if frecuencia >= min_frecuencia}
 
-    # Extraer todo el texto de los enlaces en la página
-    todo_el_texto = ' '.join([link.text.strip() for link in response.html.find('a')])
-
-    # Obtener las palabras clave más frecuentes que aparecen al menos N veces
+    # Extraer todo el texto de los enlaces
+    enlaces = driver.find_elements(By.TAG_NAME, 'a')
+    todo_el_texto = ' '.join([enlace.text.strip() for enlace in enlaces])
     palabras_clave_frecuentes = obtener_palabras_clave_frecuentes(todo_el_texto, N)
 
     enlaces_con_palabras_clave = []
-    palabras_usadas = set()  # Para asegurarnos de que no se repitan las palabras clave
-
-    # Iterar sobre todos los enlaces encontrados en la página
-    for link in response.html.find('a'):
-        texto_enlace = link.text.strip().lower()
-
+    palabras_usadas = set()
+    
+    for enlace in enlaces:
+        texto_enlace = enlace.text.strip().lower()
         if texto_enlace:
-            # Verificar si alguna de las palabras clave frecuentes aparece en el enlace
             for palabra in palabras_clave_frecuentes:
                 if palabra in texto_enlace and palabra not in palabras_usadas:
-                    enlaces_con_palabras_clave.append(f"Enlace: '{texto_enlace}' contiene la palabra clave: '{palabra}'. Podría ser un enlace relevante para entender de que trata el sitio.")
-                    palabras_usadas.add(palabra)
-                    break  # Salir del bucle para evitar agregar el mismo enlace varias veces
-
-        # Verificar si el enlace contiene una imagen o icono con alt o aria-label relevante
-        elif link.find('img'):
-            alt_text = link.find('img')[0].attrs.get('alt', '').lower()
-            for palabra in palabras_clave_frecuentes:
-                if palabra in alt_text and palabra not in palabras_usadas:
-                    enlaces_con_palabras_clave.append(f"Imagen con alt: '{alt_text}' contiene la palabra clave: '{palabra}'. Podría ser un enlace relevante para entender de que trata el sitio.")
+                    enlaces_con_palabras_clave.append(f"Enlace: '{texto_enlace}' contiene la palabra clave: '{palabra}'.")
                     palabras_usadas.add(palabra)
                     break
 
-        elif link.attrs.get('aria-label'):
-            aria_label = link.attrs.get('aria-label', '').lower()
-            for palabra in palabras_clave_frecuentes:
-                if palabra in aria_label and palabra not in palabras_usadas:
-                    enlaces_con_palabras_clave.append(f"Enlace con aria-label: '{aria_label}' contiene la palabra clave: '{palabra}'. Podría ser un enlace relevante para entender de que trata el sitio.")
-                    palabras_usadas.add(palabra)
-                    break
-
-    # Evaluación del resultado
     if enlaces_con_palabras_clave:
         print("Enlaces que contienen palabras clave frecuentes:")
         for detalle in enlaces_con_palabras_clave:
@@ -175,23 +284,19 @@ def hdu_uno(url):
     else:
         print(f"No se encontraron enlaces que contengan palabras clave que aparezcan al menos {N} veces.")
 
-    # 3. Verificación de imágenes genéricas.
+    # 3. Verificación de imágenes genéricas (sin requests.get)
     nlp = spacy.load("en_core_web_md")
-
-    # Palabras clave negativas
     palabras_clave_negativas = [
         'clipart', 'generic', 'placeholder', 'dummy', 'image1', 'stock',
         'shutterstock', 'getty', 'example', 'lorem', 'ipsum', 'filler', 'template'
     ]
-
-    # Lista para almacenar mensajes de advertencia
     mensajes_advertencia = []
     conteo_errores_imagenes = 0
 
-    # Verificación de imágenes y su texto alternativo
-    for img in response.html.find('img'):
-        alt_text = img.attrs.get('alt', '').strip().lower()
-        src = img.attrs.get('src', '').strip().lower()
+    imagenes = driver.find_elements(By.TAG_NAME, 'img')
+    for img in imagenes:
+        alt_text = img.get_attribute('alt').strip().lower()
+        src = img.get_attribute('src').strip().lower()
         problema_detectado = False
 
         # Validar que la imagen tenga texto alternativo significativo
@@ -204,41 +309,15 @@ def hdu_uno(url):
                 mensajes_advertencia.append(f"Imagen genérica o de baja calidad detectada. Fuente: {src} con descripción '{alt_text}'")
                 problema_detectado = True
 
-        # Comprobación de tamaño de imagen
-        try:
-            width = int(img.attrs.get('width', 0))
-            height = int(img.attrs.get('height', 0))
-            aspect_ratio = width / height if height > 0 else 0
+        # Verificación de dimensiones de imagen usando Selenium
+        width = img.size['width']
+        height = img.size['height']
 
-            if width < 50 or height < 50:
-                mensajes_advertencia.append(f"Imagen muy pequeña detectada. Fuente: {src}")
-                problema_detectado = True
-            elif aspect_ratio < 0.5 or aspect_ratio > 2:
-                mensajes_advertencia.append(f"Imagen con dimensiones inusuales detectada. Fuente: {src}")
-                problema_detectado = True
-
-            # Verificación de compresión excesiva
-            if not problema_detectado:  # Solo verificar compresión si no se detectó otro problema grave
-                try:
-                    image_url = src if src.startswith('http') else f"https://{src}"
-                    image_response = requests.get(image_url)
-                    image_response.raise_for_status()
-                    image = Image.open(BytesIO(image_response.content))
-
-                    file_size_kb = len(image_response.content) / 1024  # Tamaño del archivo en KB
-                    pixel_count = width * height
-                    compression_ratio = file_size_kb / pixel_count if pixel_count > 0 else 0
-
-                    if compression_ratio < 0.1:
-                        mensajes_advertencia.append(f"Imagen de baja calidad detectada (muy comprimida). Fuente: {src}")
-                        problema_detectado = True
-
-                except requests.exceptions.RequestException:
-                    mensajes_advertencia.append(f"Problema al cargar la imagen. Fuente: {src}")
-                    problema_detectado = True
-
-        except ValueError:
-            mensajes_advertencia.append(f"No se pudieron verificar las dimensiones de la imagen. Fuente: {src}")
+        if width < 50 or height < 50:
+            mensajes_advertencia.append(f"Imagen muy pequeña detectada. Fuente: {src}")
+            problema_detectado = True
+        elif width / height < 0.5 or width / height > 2:
+            mensajes_advertencia.append(f"Imagen con dimensiones inusuales detectada. Fuente: {src}")
             problema_detectado = True
 
         # Verificar si el nombre del archivo de la imagen en el src indica que podría ser genérica
@@ -246,140 +325,87 @@ def hdu_uno(url):
             mensajes_advertencia.append(f"Nombre del archivo sugiere que la imagen podría ser genérica. Fuente: {src}")
             problema_detectado = True
 
-        # Verificación semántica del texto alternativo usando NLP
-        if alt_text and not problema_detectado:  # Solo verificar semántica si no hay otros problemas
-            alt_doc = nlp(alt_text)
-            page_content = nlp(" ".join([p.text for p in response.html.find('p')])) if response.html.find('p') else None
-
-            if alt_doc and page_content:
-                if alt_doc.vector_norm and page_content.vector_norm:
-                    similarity = alt_doc.similarity(page_content)
-                    if similarity < 0.2:
-                        mensajes_advertencia.append(f"Descripción de la imagen no relevante para el contenido. Fuente: {src}")
-                else:
-                    mensajes_advertencia.append(f"No se pudo verificar la relevancia de la descripción para la imagen. Fuente: {src}")
-            else:
-                mensajes_advertencia.append("No se pudo realizar la verificación semántica del texto alternativo.")
-
-        # Incrementar el conteo de errores si se detectó un problema
         if problema_detectado:
             conteo_errores_imagenes += 1
 
-    # Evaluación final
     if mensajes_advertencia:
         for mensaje in mensajes_advertencia:
             print(mensaje)
 
         if conteo_errores_imagenes >= 5:
-            print(f"Se encontraron {conteo_errores_imagenes} problemas con las imágenes del sitio. Esto podría indicar un mantenimiento deficiente o el uso de contenido desactualizado.")
+            print(f"Se encontraron {conteo_errores_imagenes} problemas con las imágenes del sitio.")
     else:
         print("Validación de imágenes completada sin problemas.")
 
-
     # 4. Optimización del título para buscadores
     nlp = spacy.load("en_core_web_md")
-    title_tag = response.html.find('title', first=True)
+    title_tag = driver.find_element(By.TAG_NAME, 'title').text
     mensajes_advertencia = []
 
     if title_tag:
-        title_text = title_tag.text.strip()
+        title_text = title_tag.strip()
 
-        # Verificación de la longitud del título
         if 50 <= len(title_text) <= 60:
             print("Título con longitud óptima para buscadores:", title_text)
         elif len(title_text) < 50:
-            mensajes_advertencia.append(f"Advertencia: El título es demasiado corto ({len(title_text)} caracteres): {title_text}")
+            mensajes_advertencia.append(f"El título es demasiado corto ({len(title_text)} caracteres): {title_text}")
         else:
-            mensajes_advertencia.append(f"Advertencia: El título es demasiado largo ({len(title_text)} caracteres): {title_text}")
+            mensajes_advertencia.append(f"El título es demasiado largo ({len(title_text)} caracteres): {title_text}")
 
         # Análisis de palabras clave en el título
-        title_doc = nlp(title_text)
+        page_content = " ".join([p.text for p in driver.find_elements(By.TAG_NAME, 'p')])
+        title_similarity = nlp(title_text).similarity(nlp(page_content))
 
-        # Obtener el contenido de la página para comparar
-        page_content = " ".join([p.text for p in response.html.find('p')])
-        page_doc = nlp(page_content)
-
-        # Extraer palabras clave del contenido de la página
-        keywords = [token.text for token in page_doc if token.is_alpha and not token.is_stop and len(token.text) > 3]
-        common_keywords = [token.text for token in title_doc if token.text in keywords]
-
-        if common_keywords:
-            print(f"Palabras clave relevantes encontradas en el título: {', '.join(common_keywords)}")
-        else:
-            mensajes_advertencia.append(f"Advertencia: El título no contiene palabras clave relevantes o bien no se vuelve a mencionar el título en el resto del sitio.: {title_text}.")
-
-        # Evaluación de la relevancia semántica del título
-        title_similarity = title_doc.similarity(page_doc)
-        if title_similarity < 0.2:  # Ajustar el umbral según las necesidades
-            mensajes_advertencia.append(f"Advertencia: El título '{title_text}' puede no ser relevante para el contenido de la página o bien no se vuelve a mencionar en el resto del sitio.")
+        if title_similarity < 0.2:
+            mensajes_advertencia.append(f"El título '{title_text}' puede no ser relevante para el contenido de la página.")
         else:
             print(f"El título es semánticamente relevante con una similitud de {title_similarity:.2f} con el contenido de la página.")
     else:
         mensajes_advertencia.append("Error crítico: No se encontró un título en la página.")
 
-    # Evaluación final
     if mensajes_advertencia:
         for mensaje in mensajes_advertencia:
             print(mensaje)
-    else:
-        print("Validación del título completada sin problemas.")
 
-    # 5. Información corporativa en la página (considerando inglés y español)
-    # Ampliar la lista de palabras clave para detectar información corporativa
+    # 5. Información corporativa en la página
     palabras_clave_corporativas = [
         "acerca de", "sobre nosotros", "about", "about us", "empresa", "quiénes somos",
         "compañía", "our company", "our team", "our story", "historia", "nuestra empresa", "contacto", "contact us"
     ]
 
-    # Buscar secciones relevantes en el pie de página o divs específicos
-    about_sections = response.html.find('footer, div')
+    secciones_corporativas = driver.find_elements(By.TAG_NAME, 'footer') + driver.find_elements(By.TAG_NAME, 'div')
     corporate_info_detectada = False
 
-    for section in about_sections:
+    for section in secciones_corporativas:
         section_text = section.text.lower()
 
-        # Verificar si la sección contiene alguna de las palabras clave corporativas
         if any(keyword in section_text for keyword in palabras_clave_corporativas):
-            print("Información corporativa detectada correctamente. Los visitantes entenderán quién está detrás del sitio.")
+            print("Información corporativa detectada correctamente.")
             corporate_info_detectada = True
-            break  # Si se detecta, no necesitamos seguir buscando
+            break
 
-    # Evaluación final
-    if corporate_info_detectada != True:
+    if not corporate_info_detectada:
         print("Información corporativa NO detectada.")
 
-    # 6. URL sencilla y fácil de recordar.
-    # Extraer y analizar la URL de la página
+    # 6. URL sencilla y fácil de recordar
     url_parts = urlparse(url)
     path = url_parts.path.strip('/')
     path_segments = path.split('/')
     query = url_parts.query
 
-    # Evaluar la simplicidad de la URL
     url_simple = True
     mensajes_advertencia = []
 
-    # Verificar la presencia de parámetros en la URL
     if query:
         url_simple = False
         mensajes_advertencia.append(f"URL compleja: contiene parámetros en la cadena de consulta: '{query}'")
-
-    # Verificar la longitud de la URL
-    if len(url) > 100:  # Umbral ajustable para considerar una URL demasiado larga
+    if len(url) > 100:
         url_simple = False
         mensajes_advertencia.append(f"URL demasiado larga: {len(url)} caracteres")
-
-    # Verificar la cantidad de subdirectorios y su simplicidad
-    if len(path_segments) > 2:  # Umbral ajustable para la cantidad de subdirectorios
+    if len(path_segments) > 2:
         url_simple = False
         mensajes_advertencia.append(f"URL con múltiples subdirectorios: {'/'.join(path_segments)}")
 
-    # Verificar la presencia de identificadores crípticos o poco memorables
-    if any(segment.isdigit() for segment in path_segments):
-        url_simple = False
-        mensajes_advertencia.append(f"URL con identificadores numéricos en la ruta: {'/'.join(path_segments)}")
-
-    # Evaluación final
     if url_simple:
         print("La URL es sencilla y fácil de recordar:", url)
     else:
@@ -387,54 +413,49 @@ def hdu_uno(url):
             print(mensaje)
 
 def hdu_dos(url):
-    response = asyncio.get_event_loop().run_until_complete(get_page(url))
-    chrome_options = Options()
-    chrome_options.add_argument('--headless')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_argument('--window-size=1920x1080')
-
-    # Usar `webdriver-manager` para manejar `ChromeDriver`
-    service = Service(ChromeDriverManager().install())
-
-    # Iniciar WebDriver con el servicio y las opciones configuradas
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-
-    # Navegar a la página deseada
     driver.get(url)
+    
+    pdf.multicell(200,10,txt= "Orientación de Tareas", ln=True, align='C')
+    
+    # --- Análisis de Recursos ---
 
-    # Recuento de recursos innecesarios.
     # Recuento y análisis de scripts
     scripts = driver.find_elements(By.TAG_NAME, 'script')
     large_scripts = [script for script in scripts if script.get_attribute('src') and len(script.get_attribute('src')) > 0]
-    print(f"Se encontró {len(scripts)} script{'s' if len(scripts) != 1 else ''} en la página.")
+    
+    pdf.multicell(200,10, txt= f"Se encontró {len(scripts)} script{'s' if len(scripts) != 1 else ''} en la página.", ln=True, align='C')
+    #print(f"Se encontró {len(scripts)} script{'s' if len(scripts) != 1 else ''} en la página.")
     if large_scripts:
-        print(f"Script{'s' if len(large_scripts) != 1 else ''} con fuente externa: {len(large_scripts)}")
+        pdf.multicell(200,10, txt=f"Script{'s' if len(large_scripts) != 1 else ''} con fuente externa: {len(large_scripts)}", ln=True, align='C')
+        #print(f"Script{'s' if len(large_scripts) != 1 else ''} con fuente externa: {len(large_scripts)}")
 
     # Recuento y análisis de videos
     videos = driver.find_elements(By.TAG_NAME, 'video')
-    print(f"Se encontró {len(videos)} video{'s' if len(videos) != 1 else ''} en la página.")
+    pdf.multicell(200,10,txt= f"Se encontró {len(videos)} video{'s' if len(videos) != 1 else ''} en la página.", ln=True, align='C')
+    #print(f"Se encontró {len(videos)} video{'s' if len(videos) != 1 else ''} en la página.")
     for video in videos:
         video_size = int(video.get_attribute('size')) if video.get_attribute('size') else 0
         if video_size > 5000000:  # Umbral ajustable, por ejemplo, 5MB
-            print(f"Advertencia: Video grande detectado con tamaño {video_size / 1000000:.2f}MB")
+            pdf.multicell(200,10,txt= f"Advertencia: Video grande detectado con tamaño {video_size / 1000000:.2f}MB", ln=True, align='C')
+            #print(f"Advertencia: Video grande detectado con tamaño {video_size / 1000000:.2f}MB")
 
     # Recuento y análisis de imágenes
     imagenes = driver.find_elements(By.TAG_NAME, 'img')
-    print(f"Se encontró {len(imagenes)} imagen{'es' if len(imagenes) != 1 else ''} en la página.")
+    pdf.multicell(200,10,txt= f"Se encontró {len(imagenes)} imagen{'es' if len(imagenes) != 1 else ''} en la página.", ln=True, align='C')
+    #print(f"Se encontró {len(imagenes)} imagen{'es' if len(imagenes) != 1 else ''} en la página.")
     for img in imagenes:
-        img_size = int(img.get_attribute('size')) if img.get_attribute('size') else 0
-        if img_size > 2000000:  # Umbral ajustable, por ejemplo, 2MB
-            print(f"Advertencia: Imagen grande detectada con tamaño {img_size / 1000000:.2f}MB")
+        width = img.size['width']
+        height = img.size['height']
+        if width < 50 or height < 50:
+            pdf.multicell(200,10,txt= f"Advertencia: Imagen muy pequeña detectada (dimensiones: {width}x{height}px)", ln=True, align='C')
+            #print(f"Advertencia: Imagen muy pequeña detectada (dimensiones: {width}x{height}px)")
+        elif width / height < 0.5 or width / height > 2:
+            pdf.multicell(200,10,txt= f"Advertencia: Imagen con dimensiones inusuales detectada (dimensiones: {width}x{height}px)", ln=True, align='C')
+            #print(f"Advertencia: Imagen con dimensiones inusuales detectada (dimensiones: {width}x{height}px)")
 
     # Recuento y análisis de archivos de audio
     audios = driver.find_elements(By.TAG_NAME, 'audio')
     print(f"Se encontró {len(audios)} archivo{'s de audio' if len(audios) != 1 else ' de audio'} en la página.")
-    for audio in audios:
-        audio_size = int(audio.get_attribute('size')) if audio.get_attribute('size') else 0
-        if audio_size > 10000000:  # Umbral ajustable, por ejemplo, 10MB
-            print(f"Advertencia: Archivo de audio grande detectado con tamaño {audio_size / 1000000:.2f}MB")
 
     # Recuento y análisis de applets (poco comunes pero posibles)
     applets = driver.find_elements(By.TAG_NAME, 'applet')
@@ -442,14 +463,15 @@ def hdu_dos(url):
     if applets:
         print("Advertencia: Uso de applets detectado. Esto podría afectar la compatibilidad y rendimiento de la página.")
 
-    # Evaluación final
+    # Evaluación de la cantidad total de recursos
     total_resources = len(scripts) + len(videos) + len(imagenes) + len(audios) + len(applets)
     if total_resources > 50:  # Umbral ajustable para cantidad total de recursos
         print(f"Advertencia: Se cargaron {total_resources} recursos en la página, lo que puede afectar el rendimiento.")
     else:
-        print(f"Cantidad total de recursos cargado{'s' if total_resources != 1 else ''} en la página: {total_resources}")
+        print(f"Cantidad total de recursos cargados en la página: {total_resources}")
 
-    # Detección de barreras innecesarias.
+    # --- Detección de Barreras Innecesarias ---
+
     # 1. Detección de formularios de registro
     try:
         registration_forms = driver.find_elements(By.CSS_SELECTOR, 'form[action*="register"], form[action*="signup"], form[action*="subscribe"]')
@@ -492,7 +514,8 @@ def hdu_dos(url):
     except NoSuchElementException:
         print("Error al buscar botones de cierre para ventanas modales.")
 
-    # Cantidad de ventanas que se abren por navegación.
+    # --- Cantidad de Ventanas/Pestañas Abiertas ---
+
     # Obtener el número inicial de ventanas/pestañas abiertas
     initial_window_handles = driver.window_handles
     initial_window_count = len(initial_window_handles)
@@ -501,9 +524,8 @@ def hdu_dos(url):
     # Inicializar current_window_count
     current_window_count = initial_window_count
 
-    # Ejecutar una serie de acciones que podrían abrir nuevas ventanas/pestañas
+    # Ejecutar una acción para verificar si se abren nuevas ventanas/pestañas
     try:
-        # Ejemplo: clic en un enlace que podría abrir una nueva ventana/pestaña
         potential_link = driver.find_element(By.CSS_SELECTOR, 'a[target="_blank"]')
         potential_link_text = potential_link.text or potential_link.get_attribute('href')
         print(f"Se hizo clic en el enlace que potencialmente abre nueva pestaña: '{potential_link_text}'")
@@ -524,36 +546,32 @@ def hdu_dos(url):
     except NoSuchElementException:
         print("No se encontró un enlace que abra una nueva ventana o pestaña.")
 
-    # Evaluación final
+    # Evaluación final de ventanas abiertas
     if current_window_count > initial_window_count:
-        print(f"Advertencia: Durante la navegación se abrió(eron) {current_window_count - initial_window_count} nueva(s) ventana(s)/pestaña(s), lo que podría afectar la experiencia del usuario.")
+        print(f"Advertencia: Se abrió(eron) {current_window_count - initial_window_count} nueva(s) ventana(s)/pestaña(s), lo que podría afectar la experiencia del usuario.")
     else:
         print("Navegación sin apertura de ventanas/pestañas adicionales innecesarias.")
 
-    # Longitud y cantidad de clicks.
+    # --- Longitud y Cantidad de Clics ---
+
     # 1. Medición de la longitud de la página
     page_height = driver.execute_script("return document.body.scrollHeight")
     print(f"Altura total de la página: {page_height} píxeles")
 
-    # Evaluación de la longitud de la página
-    if page_height > 3000:  # Ajuste según el umbral esperado para la longitud de la página
+    if page_height > 3000:
         print("Advertencia: La página es demasiado larga, lo que podría afectar la navegación eficiente.")
     else:
         print("Longitud de la página dentro del rango aceptable.")
 
     # 2. Análisis de la cantidad de clics para completar una tarea clave (sección corporativa/contacto)
-
-    # Definir las palabras clave corporativas a buscar
     palabras_clave_corporativas = [
         "acerca de", "sobre nosotros", "about", "about us", "empresa", "quiénes somos",
         "compañía", "our company", "our team", "our story", "historia", "nuestra empresa", "contacto", "contact us"
     ]
 
-    # Inicializar contador de clics y bandera para detección de secciones corporativas
     click_count = 0
     seccion_encontrada = False
 
-    # 1. Búsqueda en enlaces
     for palabra in palabras_clave_corporativas:
         try:
             enlace_corporativo = driver.find_element(By.PARTIAL_LINK_TEXT, palabra)
@@ -566,11 +584,9 @@ def hdu_dos(url):
         except NoSuchElementException:
             continue
 
-    # 2. Si no se encuentra en enlaces, buscar en otros elementos de la página
     if not seccion_encontrada:
         for palabra in palabras_clave_corporativas:
             try:
-                # Buscar en otros elementos comunes como divs, spans, párrafos
                 secciones = driver.find_elements(By.XPATH, f"//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '{palabra}')]")
                 for seccion in secciones:
                     if seccion.is_displayed():
@@ -582,9 +598,8 @@ def hdu_dos(url):
             except NoSuchElementException:
                 continue
 
-    # Evaluación final
     if seccion_encontrada and click_count > 0:
-        if click_count > 3:  # Ajuste según el umbral aceptable de clics para completar una tarea
+        if click_count > 3:
             print(f"Advertencia: Se requieren {click_count} clics para acceder a la sección corporativa.")
         else:
             print(f"La sección corporativa fue accesible con {click_count} clic(s), dentro del rango aceptable.")
@@ -594,8 +609,6 @@ def hdu_dos(url):
         print("No se encontró ninguna sección corporativa utilizando las palabras clave especificadas.")
 
     # 3. Verificación de la profundidad de navegación
-
-    # Ejemplo: Medición de la profundidad del menú de navegación
     menus = driver.find_elements(By.CSS_SELECTOR, 'nav, ul, ol')
     depth_counts = []
 
@@ -606,17 +619,16 @@ def hdu_dos(url):
     if depth_counts:
         max_depth = max(depth_counts)
         print(f"Profundidad máxima de navegación detectada: {max_depth} niveles.")
-        if max_depth > 2:  # Ajuste según el umbral aceptable para la profundidad
+        if max_depth > 2:
             print("Advertencia: La estructura de navegación es demasiado profunda.")
         else:
             print("La estructura de navegación es aceptablemente profunda.")
     else:
         print("No se detectaron menús con subniveles.")
 
+    # --- Formularios y Un-Click ---
 
-    # Un click en formularios.
-
-    # 1. Búsqueda de formularios y verificación de autocompletar
+    # Búsqueda de formularios y verificación de autocompletar
     formularios = driver.find_elements(By.TAG_NAME, 'form')
     formularios_con_autocompletar = []
     formularios_con_un_click = []
@@ -632,11 +644,10 @@ def hdu_dos(url):
         for boton in botones_un_click:
             if 'one-click' in boton.get_attribute('class').lower() or 'quick' in boton.get_attribute('class').lower():
                 formularios_con_un_click.append(form)
-                break  # Solo necesitamos un botón de este tipo para considerar el formulario
+                break
 
-    # Evaluación de los formularios encontrados
     if formularios_con_autocompletar:
-        print(f"Se encontraron {len(formularios_con_autocompletar)} formularios con autocompletar habilitado (Podrían ser barras de búsqueda).")
+        print(f"Se encontraron {len(formularios_con_autocompletar)} formularios con autocompletar habilitado.")
     else:
         print("No se encontraron formularios con autocompletar habilitado.")
 
@@ -649,19 +660,14 @@ def hdu_dos(url):
     if not formularios_con_autocompletar and not formularios_con_un_click:
         print("No se encontraron formularios con autocompletar ni con botones de acción rápida, podría considerarse una oportunidad de mejora en la usabilidad.")
 
-def hdu_tres(url):
-    response = asyncio.get_event_loop().run_until_complete(get_page(url))
-    # Configurar Selenium con Chrome en modo headless
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    driver.quit()
 
+
+def hdu_tres(url):
     # Navegar a la URL
     driver.get(url)
 
-        # 7. Verificación de menús de navegación y enlaces visibles
+    # --- Verificación de menús de navegación y enlaces visibles ---
     selectors = ['nav', 'ul', 'ol', '.menu', '.navbar', '.navigation']
     navigation_menus = []
     for selector in selectors:
@@ -685,7 +691,7 @@ def hdu_tres(url):
     else:
         print("No se encontraron menús de navegación.")
 
-    # 2. Verificación de un enlace para regresar a la página de inicio
+    # --- Verificación de un enlace para regresar a la página de inicio ---
     try:
         home_link = driver.find_element(By.CSS_SELECTOR, 'a[href="/"], a[rel="home"], a[class*="home"], a[href^="/index"]')
         if home_link.is_displayed():
@@ -695,8 +701,7 @@ def hdu_tres(url):
     except NoSuchElementException:
         print("No se encontró un enlace para regresar a la página de inicio.")
 
-    # 1. Búsqueda de menús de navegación y análisis de su estructura
-    navigation_menus = driver.find_elements(By.CSS_SELECTOR, 'nav, ul, ol, .menu, .navbar, .navigation')
+    # --- Búsqueda de menús de navegación y análisis de su estructura ---
     total_items = 0
     deep_menus_count = 0
     max_depth = 0
@@ -720,7 +725,7 @@ def hdu_tres(url):
     else:
         print("No se encontraron menús de navegación en la página.")
 
-    # 9. Verificación de la ubicación y clicabilidad de las pestañas de navegación
+    # --- Verificación de la ubicación y clicabilidad de las pestañas de navegación ---
     tabs = driver.find_elements(By.CSS_SELECTOR, 'nav a, header a, .menu a, .navbar a')
     tabs_at_top = [tab for tab in tabs if tab.location['y'] < 200]
 
@@ -730,7 +735,8 @@ def hdu_tres(url):
             print(f"Se encontraron {len(clickeable_tabs)} pestañas de navegación en la parte superior, todas clickeables.")
             for index, tab in enumerate(clickeable_tabs, start=1):
                 print(f"Pestaña {index}: Texto='{tab.text}', Posición Y={tab.location['y']}px")
-                tab.screenshot(f"pestana_{index}_captura.png")
+                screenshot_path = os.path.join(output_folder, f"pestana_{index}_captura.png")
+                tab.screenshot(screenshot_path)
         else:
             print("Se encontraron pestañas en la parte superior, pero ninguna es clickeable.")
     else:
@@ -742,11 +748,12 @@ def hdu_tres(url):
             container_tabs = container.find_elements(By.TAG_NAME, 'a')
             if container_tabs:
                 print(f"Contenedor de navegación superior encontrado con {len(container_tabs)} pestañas.")
-                container.screenshot(f"contenedor_superior_captura.png")
+                screenshot_path = os.path.join(output_folder, f"contenedor_superior_captura.png")
+                container.screenshot(screenshot_path)
             else:
                 print(f"Contenedor de navegación superior encontrado, pero sin pestañas clickeables.")
 
-    # 10. Verificación de la accesibilidad del contenido desde múltiples enlaces
+    # --- Verificación de la accesibilidad del contenido desde múltiples enlaces ---
     ruta_links = defaultdict(list)
     for link in driver.find_elements(By.TAG_NAME, 'a'):
         href = link.get_attribute('href')
@@ -762,13 +769,12 @@ def hdu_tres(url):
         if len(links) > 1:
             rutas_con_multiples_enlaces += 1
             print(f"Ruta '{ruta}' accesible desde {len(links)} enlaces diferentes.")
-            # Guardar la captura de pantalla solo para una de las rutas
             if rutas_con_multiples_enlaces == 1:
-                links[0].screenshot(f"multiple_links_{ruta.strip('/').replace('/', '_')}.png")
+                screenshot_path = os.path.join(output_folder, f"multiple_links_{ruta.strip('/').replace('/', '_')}.png")
+                links[0].screenshot(screenshot_path)
         else:
             rutas_unicas += 1
 
-    # Evaluación final
     if rutas_con_multiples_enlaces > 0:
         print(f"Se encontraron {rutas_con_multiples_enlaces} rutas accesibles desde múltiples enlaces.")
     else:
@@ -776,7 +782,7 @@ def hdu_tres(url):
 
     print(f"Total de rutas únicas: {rutas_unicas}")
 
-    # 11. Verificación de enlaces diferenciados para acciones especiales (descargas, nuevas ventanas)
+    # --- Verificación de enlaces diferenciados para acciones especiales ---
     action_links = driver.find_elements(By.CSS_SELECTOR, 'a[target="_blank"], a[download], a[href^="javascript"], a[rel*="noopener"], a[rel*="noreferrer"], a[href*="file"], a[href*="download"], a[href*="pdf"]')
 
     if action_links:
@@ -797,15 +803,7 @@ def hdu_tres(url):
     else:
         print("No se encontraron enlaces con acciones especiales diferenciadas.")
 
-    download_links = [link for link in action_links if link.get_attribute('download')]
-    new_window_links = [link for link in action_links if link.get_attribute('target') == '_blank']
-    javascript_links = [link for link in action_links if link.get_attribute('href').startswith('javascript')]
-
-    print(f"Enlaces de descarga detectados: {len(download_links)}")
-    print(f"Enlaces que abren nuevas ventanas detectados: {len(new_window_links)}")
-    print(f"Enlaces que ejecutan JavaScript detectados: {len(javascript_links)}")
-
-    # 12. Verificación de enlaces "Logo" y "Inicio" para regresar a la página principal
+    # --- Verificación de enlaces "Logo" y "Inicio" para regresar a la página principal ---
     try:
         logo_selectores = [
             'a[rel="home"]', 'a.logo', 'a[href="/"]', 'a[href*="index"]',
@@ -861,7 +859,7 @@ def hdu_tres(url):
     except Exception as e:
         print(f"Error inesperado durante la verificación: {str(e)}")
 
-    # 13. Verificación de consistencia en la ubicación de instrucciones, preguntas y mensajes
+    # --- Verificación de consistencia en la ubicación de instrucciones, preguntas y mensajes ---
     try:
         instruction_elements = driver.find_elements(By.CSS_SELECTOR, '.instruction, .help-text, .error-message, .hint, .validation-message')
 
@@ -880,7 +878,7 @@ def hdu_tres(url):
     except Exception as e:
         print(f"Error al verificar la consistencia de ubicación: {str(e)}")
 
-    # 14. Verificación de la existencia de páginas de ayuda y mensajes de error detallados
+    # --- Verificación de la existencia de páginas de ayuda y mensajes de error detallados ---
     try:
         help_pages = driver.find_elements(By.LINK_TEXT, 'Ayuda') + driver.find_elements(By.PARTIAL_LINK_TEXT, 'Help')
         error_pages = driver.find_elements(By.CSS_SELECTOR, '.error-message, .error-page, .alert-danger, .validation-error')
@@ -900,16 +898,8 @@ def hdu_tres(url):
     # Cerrar el driver
     driver.quit()
 
-    # --- Nuevos Criterios ---
-
 def hdu_cuatro(url):
-    response = asyncio.get_event_loop().run_until_complete(get_page(url))
-    # Configurar Selenium con Chrome en modo headless
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
 
     # Navegar a la URL
     driver.get(url)
@@ -996,32 +986,16 @@ def hdu_cuatro(url):
         if pattern or input_mode:
             print(f"Campo '{field_name}' con formateo automático detectado (pattern: {pattern}, inputmode: {input_mode})")
 
-        elif field_type == 'text' and ('currency' in (field_name or '').lower() or 'price' in (placeholder or '').lower()):
-            print(f"Advertencia: El campo de moneda '{field_name}' podría beneficiarse de un patrón o inputmode para facilitar el formateo.")
-
-        elif field_type == 'number' and not pattern:
-            print(f"Advertencia: El campo numérico '{field_name}' no tiene un patrón definido para garantizar un formateo adecuado.")
-
         if input_mode:
             if input_mode == 'numeric' and field_type == 'text':
                 print(f"Campo '{field_name}' utiliza 'inputmode=numeric' para facilitar la entrada de datos numéricos.")
             elif input_mode == 'decimal' and field_type == 'text':
                 print(f"Campo '{field_name}' utiliza 'inputmode=decimal' para facilitar la entrada de números decimales.")
-            else:
-                print(f"Advertencia: El campo '{field_name}' tiene un inputmode '{input_mode}' que puede no ser consistente con el tipo de dato esperado.")
 
         if autocomplete:
             print(f"Campo '{field_name}' tiene habilitado el autocompletado con 'autocomplete={autocomplete}'.")
 
-    critical_fields = [field for field in input_fields if 'currency' in (field.get_attribute('name') or '').lower() or 'phone' in (field.get_attribute('name') or '').lower()]
-    if critical_fields:
-        print(f"Se encontraron {len(critical_fields)} campos críticos que requieren formateo automático.")
-        for field in critical_fields:
-            pattern = field.get_attribute('pattern')
-            if not pattern:
-                print(f"Advertencia: El campo crítico '{field.get_attribute('name')}' no tiene un patrón definido para formateo.")
-
-    # 17. Detección de Etiquetas para Campos Requeridos y Opcionales
+    # 17. Detección de etiquetas para campos requeridos y opcionales
     palabras_clave_requerido = ['required', 'obligatorio', 'necesario', '*', 'must', 'mandatory']
     palabras_clave_opcional = ['optional', 'opcional']
     labels = driver.find_elements(By.CSS_SELECTOR, 'label')
@@ -1247,21 +1221,10 @@ def hdu_cuatro(url):
         except Exception as e:
             print(f"Hubo un problema al interactuar con el campo '{field_name_or_id}': {e}")
 
-
-
     # Cerrar el driver
-    driver.quit()
-
-    ################################ Aqui va el C.A 1 de la H.U 1.5 ##########################################
-
+    driver.quit
 def hdu_cinco(url):
-    response = asyncio.get_event_loop().run_until_complete(get_page(url))
-    # Configurar Selenium con Chrome en modo headless
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
 
     # Navegar a la URL
     driver.get(url)
@@ -1353,7 +1316,6 @@ def hdu_cinco(url):
     else:
         print("No se detectaron errores tipográficos u ortográficos.")
 
-
     # 30. Detección de Listas y Viñetas
     # Detectar listas no ordenadas, ordenadas y listas de definiciones
     list_types = ['ul', 'ol', 'dl']
@@ -1369,7 +1331,6 @@ def hdu_cinco(url):
         print(f"Se encontraron {len(lists)} listas (viñetas, numeradas o de definiciones) en la página.")
     else:
         print("No se encontraron listas en la página, posible uso excesivo de texto narrativo.")
-
 
     # 31. Evaluación de la Jerarquía del Contenido mediante Encabezados (H1, H2, etc.)
     headers = driver.find_elements(By.CSS_SELECTOR, 'h1, h2, h3, h4, h5, h6')
@@ -1398,7 +1359,6 @@ def hdu_cinco(url):
     else:
         print("No se encontraron encabezados, posible falta de estructura jerárquica en el contenido.")
 
-
     # 32. Análisis de la Estructura de las Páginas para Mejorar la Legibilidad
     large_titles = driver.find_elements(By.CSS_SELECTOR, 'h1')
     subtitles = driver.find_elements(By.CSS_SELECTOR, 'h2, h3, h4')
@@ -1418,8 +1378,11 @@ def hdu_cinco(url):
     else:
         print("La estructura de la página podría no estar optimizada para la legibilidad.")
 
-
     # 33. Análisis de la Longitud y Descriptividad de Títulos y Subtítulos
+    title_threshold = 60  # Definir un umbral para la longitud de los títulos
+    def is_descriptive(text):
+        return len(text) > 5  # Define aquí tu criterio de descriptividad
+
     # Análisis de títulos
     for title in large_titles:
         title_length = len(title.text)
@@ -1452,13 +1415,7 @@ def hdu_cinco(url):
     driver.quit()
 
 def hdu_seis(url):
-    response = asyncio.get_event_loop().run_until_complete(get_page(url))
-    # Configurar Selenium con Chrome en modo headless
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
 
     # Navegar a la URL
     driver.get(url)
@@ -1473,9 +1430,27 @@ def hdu_seis(url):
     # 36. Evaluación de la Jerarquía del Contenido mediante Encabezados (H1, H2, etc.)
     headers = driver.find_elements(By.CSS_SELECTOR, 'h1, h2, h3, h4, h5, h6')
     if headers:
+        last_level = 0
+        hierarchy_correct = True
         for header in headers:
-            print(f"Encabezado {header.tag_name.upper()} encontrado: {header.text}")
-        print("La jerarquía de encabezados está presente.")
+            header_text = header.text.strip()
+            if header.is_displayed() and header_text:
+                current_level = int(header.tag_name[1])
+                print(f"Encabezado {header.tag_name.upper()} encontrado: {header_text}")
+
+                # Verificar jerarquía
+                if current_level > last_level + 1:
+                    print(f"Advertencia: El encabezado {header.tag_name.upper()} parece estar fuera de orden jerárquico.")
+                    hierarchy_correct = False
+
+                last_level = current_level
+            else:
+                print(f"Encabezado {header.tag_name.upper()} encontrado, pero está vacío o no es visible.")
+
+        if hierarchy_correct:
+            print("La jerarquía de encabezados está presente y parece correcta.")
+        else:
+            print("Se detectaron posibles problemas en la jerarquía de encabezados.")
     else:
         print("No se encontraron encabezados, posible falta de estructura jerárquica en el contenido.")
 
@@ -1485,20 +1460,38 @@ def hdu_seis(url):
     paragraphs = driver.find_elements(By.CSS_SELECTOR, 'p')
 
     if large_titles and subtitles and paragraphs:
+        long_paragraphs = [p for p in paragraphs if len(p.text.split()) > 100]  # Umbral de 100 palabras por párrafo
+        if long_paragraphs:
+            print(f"Se detectaron {len(long_paragraphs)} párrafos largos. Considera dividirlos para mejorar la legibilidad.")
+        else:
+            print("Los párrafos son cortos y adecuados para la legibilidad.")
+
         print("La página contiene títulos grandes, subtítulos y párrafos cortos, lo que mejora la legibilidad.")
     else:
         print("La estructura de la página podría no estar optimizada para la legibilidad.")
 
     # 38. Análisis de la Longitud y Descriptividad de Títulos y Subtítulos
+    title_threshold = 60  # Definir un umbral para la longitud de los títulos
+    def is_descriptive(text):
+        return len(text) > 5  # Define aquí tu criterio de descriptividad
+
+    # Análisis de títulos
     for title in large_titles:
-        if len(title.text) > 60:
-            print(f"Título largo detectado: {title.text} (longitud: {len(title.text)} caracteres).")
+        title_length = len(title.text)
+        if title_length > title_threshold:
+            print(f"Título largo detectado: {title.text} (longitud: {title_length} caracteres).")
+        elif not is_descriptive(title.text):
+            print(f"Título genérico o poco descriptivo detectado: {title.text}")
         else:
             print(f"Título descriptivo adecuado: {title.text}")
 
+    # Análisis de subtítulos
     for subtitle in subtitles:
-        if len(subtitle.text) > 60:
-            print(f"Subtítulo largo detectado: {subtitle.text} (longitud: {len(subtitle.text)} caracteres).")
+        subtitle_length = len(subtitle.text)
+        if subtitle_length > title_threshold:
+            print(f"Subtítulo largo detectado: {subtitle.text} (longitud: {subtitle_length} caracteres).")
+        elif not is_descriptive(subtitle.text):
+            print(f"Subtítulo genérico o poco descriptivo detectado: {subtitle.text}")
         else:
             print(f"Subtítulo descriptivo adecuado: {subtitle.text}")
 
@@ -1506,197 +1499,131 @@ def hdu_seis(url):
     driver.quit()
 
 def hdu_siete(url):
-    response = asyncio.get_event_loop().run_until_complete(get_page(url))
-    # Configurar Selenium con Chrome en modo headless
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
 
     # Navegar a la URL
     driver.get(url)
 
-    # 40. Consistencia en el Uso de Fuentes
+    # Funciones auxiliares
+    def rgb_or_rgba_to_tuple(color_str):
+        nums = re.findall(r'\d+', color_str)
+        return tuple(map(int, nums[:3]))
+
+    def luminance(rgb):
+        r, g, b = [x / 255.0 for x in rgb]
+        r = r / 12.92 if r <= 0.03928 else ((r + 0.055) / 1.055) ** 2.4
+        g = g / 12.92 if g <= 0.03928 else ((g + 0.055) / 1.055) ** 2.4
+        b = b / 12.92 if b <= 0.03928 else ((b + 0.055) / 1.055) ** 2.4
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+    def calculate_contrast(rgb1, rgb2):
+        lum1 = luminance(rgb1) + 0.05
+        lum2 = luminance(rgb2) + 0.05
+        return max(lum1, lum2) / min(lum1, lum2)
+
+    # Almacenar resultados agrupados
+    grouped_results = {
+        "fuentes": [],
+        "contraste": [],
+        "tamaño_fuente": [],
+        "desalineado": [],
+        "elementos_subrayados": [],
+        "elementos_negrita": [],
+        "otros": []
+    }
+
+    # 1. Consistencia en el Uso de Fuentes
     fonts = driver.find_elements(By.CSS_SELECTOR, '*[style*="font-family"]')
     font_families = {font.value_of_css_property('font-family') for font in fonts}
     if len(font_families) > 1:
-        print(f"Se encontraron múltiples fuentes utilizadas en el sitio: {', '.join(font_families)}")
-    else:
-        print(f"Uso consistente de la fuente: {next(iter(font_families), 'No se encontraron fuentes especificadas')}")
+        grouped_results["fuentes"].append(f"Uso inconsistente de varias fuentes en el sitio: {', '.join(font_families)}")
 
-    # 41. Verificación de Desplazamiento Horizontal
+    # 2. Verificación de Desplazamiento Horizontal
     body = driver.find_element(By.TAG_NAME, 'body')
     body_width = body.size['width']
     viewport_width = driver.execute_script("return window.innerWidth")
 
     if body_width > viewport_width:
-        print("Se requiere desplazamiento horizontal, lo cual no es deseado.")
+        grouped_results["otros"].append("Desplazamiento horizontal detectado.")
 
-        # Identificación de elementos que causan desbordamiento
-        elements = driver.find_elements(By.XPATH, "//*[self::div or self::section or self::img or self::table]")
-        for element in elements:
-            if element.size['width'] > viewport_width:
-                print(f"Elemento desbordante detectado: {element.tag_name}, tamaño: {element.size['width']}px")
-    else:
-        print("No se requiere desplazamiento horizontal.")
-
-    # 42. Detección de Enlaces Subrayados o con Indicación Visual Clara
+    # 3. Detección de Enlaces Subrayados o con Indicación Visual Clara
     links = driver.find_elements(By.TAG_NAME, 'a')
     for link in links:
         link_text = link.text.strip()
         if link.is_displayed() and link_text:
             text_decoration = link.value_of_css_property('text-decoration')
             font_weight = link.value_of_css_property('font-weight')
-            color = link.value_of_css_property('color')
             border_bottom = link.value_of_css_property('border-bottom')
 
-            # Verificar si el enlace tiene una indicación visual clara
-            if 'underline' in text_decoration or int(font_weight) >= 700 or 'solid' in border_bottom:
-                print(f"Enlace con indicación visual clara: {link_text}")
-            else:
-                print(f"Enlace sin indicación visual clara: {link_text}")
-        else:
-            print("Enlace vacío o no visible encontrado.")
+            if not ('underline' in text_decoration or int(font_weight) >= 700 or 'solid' in border_bottom):
+                grouped_results["elementos_subrayados"].append(f"Enlace sin indicación visual clara: '{link_text}'")
 
-    # 43. Revisión de la Legibilidad de las Fuentes (Tamaño y Contraste)
+    # 4. Revisión de la Legibilidad de las Fuentes (Tamaño y Contraste)
     text_elements = driver.find_elements(By.CSS_SELECTOR, 'body *')
     for elem in text_elements:
-        font_size = elem.value_of_css_property('font-size')
-        color = elem.value_of_css_property('color')
-        background_color = elem.value_of_css_property('background-color')
-        print(f"Elemento con tamaño de fuente {font_size}, color {color}, fondo {background_color}")
+        font_size_str = elem.value_of_css_property('font-size')
+        font_size = float(re.search(r'\d+(\.\d+)?', font_size_str).group())
+        color_str = elem.value_of_css_property('color')
+        background_color_str = elem.value_of_css_property('background-color')
+        color = rgb_or_rgba_to_tuple(color_str)
+        background_color = rgb_or_rgba_to_tuple(background_color_str)
 
-    # 44. Análisis del Uso de Mayúsculas Mejorado
-    def es_acronimo_o_sigla(texto):
-        # Filtra palabras que podrían ser acrónimos o siglas comunes
-        return all(c.isupper() for c in texto) and len(texto) <= 5  # Suponemos que un acrónimo tiene <= 5 letras
+        if font_size < 16:
+            grouped_results["tamaño_fuente"].append(f"{elem.tag_name} tiene un tamaño de fuente insuficiente ({font_size}px)")
 
-    capitalized_texts = driver.find_elements(By.XPATH, "//*[text()[contains(.,' ')] and string-length(text()) > 10 and translate(text(), 'abcdefghijklmnopqrstuvwxyz', 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') = text()]")
-    textos_sospechosos = []
-
-    if capitalized_texts:
-        for elem in capitalized_texts:
-            texto = elem.text.strip()
-
-            # Filtrar títulos o encabezados
-            if elem.tag_name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong']:
-                print(f"Título o encabezado en mayúsculas detectado (posiblemente aceptable): {texto}")
-
-            # Filtrar siglas o acrónimos
-            elif any(es_acronimo_o_sigla(palabra) for palabra in texto.split()):
-                print(f"Posible uso correcto de mayúsculas para acrónimo/sigla detectado: {texto}")
-
-            # Verificar el contexto del uso de mayúsculas
-            elif len(texto) > 20 and len(texto.split()) > 3:  # Suponiendo que el abuso puede ser más largo
-                textos_sospechosos.append(texto)
-            else:
-                print(f"Texto en mayúsculas detectado: {texto}")
-
-        # Evaluar la frecuencia del uso de mayúsculas
-        if len(textos_sospechosos) > 3:  # Si se detectan más de 3 casos, podría ser un abuso
-            print(f"Advertencia: Se detectaron múltiples casos de textos en mayúsculas que podrían indicar un abuso: {textos_sospechosos}")
-        else:
-            print("No se detectaron abusos en el uso de mayúsculas.")
-    else:
-        print("No se detectaron abusos en el uso de mayúsculas.")
-
-    # 45. Consistencia en el Uso de Patrones de Color
-    color_elements = driver.find_elements(By.CSS_SELECTOR, '*[style*="background-color"], *[style*="color"]')
-    colors_text = {elem.value_of_css_property('color') for elem in color_elements if elem.value_of_css_property('color')}
-    colors_background = {elem.value_of_css_property('background-color') for elem in color_elements if elem.value_of_css_property('background-color')}
-
-    # Combinación de colores de texto y de fondo
-    all_colors = colors_text.union(colors_background)
-
-    if len(all_colors) > 3:  # Ajustar según el número esperado de colores consistentes
-        print(f"Se encontraron múltiples patrones de color en el sitio: {', '.join(all_colors)}")
-    else:
-        print(f"Uso consistente de colores: {', '.join(all_colors)}")
-
-    # 46. Análisis del Uso de Cursiva y Subrayado
-    italic_elements = driver.find_elements(By.CSS_SELECTOR, 'i, em, *[style*="italic"]')
-    underlined_elements = driver.find_elements(By.CSS_SELECTOR, 'u, *[style*="underline"]')
-
-    if italic_elements:
-        for elem in italic_elements:
-            print(f"Elemento en cursiva detectado: {elem.tag_name} con texto '{elem.text}'")
-
-    if underlined_elements:
-        for elem in underlined_elements:
-            if elem.tag_name != 'a':  # Evitar confusión con enlaces
-                print(f"Advertencia: Elemento subrayado detectado que no es un enlace: {elem.tag_name} con texto '{elem.text}'")
-
-    # 47. Medición de la Longitud de las Líneas de Texto
-    paragraphs = driver.find_elements(By.CSS_SELECTOR, 'p')
-
-    for paragraph in paragraphs:
-        line_lengths = [len(line.strip()) for line in paragraph.text.split('\n')]
-        for line_length in line_lengths:
-            if 50 <= line_length <= 100:
-                print(f"Línea de texto con longitud adecuada: {line_length} caracteres")
-            else:
-                print(f"Advertencia: Línea de texto con longitud inadecuada: {line_length} caracteres")
-
-    # 48. Análisis de la Alineación de Ítems en el Diseño
-    elements = driver.find_elements(By.CSS_SELECTOR, 'body *')
-
-    for elem in elements:
-        text_align = elem.value_of_css_property('text-align')
-        vertical_align = elem.value_of_css_property('vertical-align')
-        display_type = elem.value_of_css_property('display')
-
-        print(f"Elemento con alineación: horizontal - {text_align}, vertical - {vertical_align}, display - {display_type}")
-
-        # Evaluar si hay desalineación basada en las posiciones absolutas
-        pos_x = elem.location['x']
-        pos_y = elem.location['y']
-        if pos_x % 10 != 0 or pos_y % 10 != 0:  # Suponiendo que debería estar alineado en múltiplos de 10px
-            print(f"Advertencia: Elemento desalineado en posición ({pos_x}, {pos_y})")
-
-    # 49. Verificación de la Interactividad de Elementos Clickeables
-    clickable_elements = driver.find_elements(By.CSS_SELECTOR, 'button, a, input[type="submit"], input[type="button"]')
-    for elem in clickable_elements:
-        if elem.is_enabled():
-            print(f"Elemento clickeable detectado: {elem.tag_name} con texto {elem.text} está interactuable.")
-        else:
-            print(f"Elemento clickeable detectado: {elem.tag_name} con texto {elem.text} NO está interactuable.")
-
-    # 50. Análisis del Uso de Negrita en el Texto
-    bold_elements = driver.find_elements(By.CSS_SELECTOR, 'b, strong, *[style*="bold"]')
-    if bold_elements:
-        print(f"Se encontraron {len(bold_elements)} elementos en negrita.")
-
-    # 51. Análisis del Contraste de Colores y Combinación
-    elements = driver.find_elements(By.CSS_SELECTOR, 'body *')
-    for elem in elements:
-        color = elem.value_of_css_property('color')
-        background_color = elem.value_of_css_property('background-color')
-
-        # Convertir los colores a tuplas RGB
-        if color.startswith('rgb'):
-            color = rgb_or_rgba_to_tuple(color)
-        if background_color.startswith('rgb'):
-            background_color = rgb_or_rgba_to_tuple(background_color)
-
-        # Calcular el contraste si ambos colores están en formato RGB
         if isinstance(color, tuple) and isinstance(background_color, tuple):
             contrast = calculate_contrast(color, background_color)
-            print(f"Elemento con color {color} y fondo {background_color} tiene un contraste de {contrast:.2f}")
-        else:
-            print(f"No se pudo calcular el contraste para el elemento con color {color} y fondo {background_color}")
+            if contrast < 4.5:
+                grouped_results["contraste"].append(f"{elem.tag_name} tiene un contraste insuficiente ({contrast:.2f})")
+
+    # 9. Análisis de la Alineación de Ítems en el Diseño
+    elements = driver.find_elements(By.CSS_SELECTOR, 'body *')
+    for elem in elements:
+        pos_x = elem.location['x']
+        pos_y = elem.location['y']
+        if pos_x % 10 != 0 or pos_y % 10 != 0:
+            grouped_results["desalineado"].append(f"{elem.tag_name} en posición ({pos_x}, {pos_y}) está desalineado.")
+
+    # Imprimir resultados agrupados
+    if grouped_results["fuentes"]:
+        print("**Fuentes:**")
+        for item in grouped_results["fuentes"]:
+            print(f"- {item}")
+
+    if grouped_results["contraste"]:
+        print("\n**Advertencia: Elementos con contraste insuficiente:**")
+        for item in grouped_results["contraste"]:
+            print(f"- {item}")
+
+    if grouped_results["tamaño_fuente"]:
+        print("\n**Advertencia: Elementos con tamaño de fuente insuficiente:**")
+        for item in grouped_results["tamaño_fuente"]:
+            print(f"- {item}")
+
+    if grouped_results["desalineado"]:
+        print("\n**Advertencia: Elementos desalineados:**")
+        for item in grouped_results["desalineado"]:
+            print(f"- {item}")
+
+    if grouped_results["elementos_subrayados"]:
+        print("\n**Advertencia: Enlaces sin indicación visual clara:**")
+        for item in grouped_results["elementos_subrayados"]:
+            print(f"- {item}")
+
+    if grouped_results["elementos_negrita"]:
+        print("\n**Advertencia: Uso de negrita en elementos:**")
+        for item in grouped_results["elementos_negrita"]:
+            print(f"- {item}")
+
+    if grouped_results["otros"]:
+        print("\n**Advertencia: Otros problemas detectados:**")
+        for item in grouped_results["otros"]:
+            print(f"- {item}")
 
     # Cerrar el driver
     driver.quit()
 
 def hdu_ocho(url):
-    response = asyncio.get_event_loop().run_until_complete(get_page(url))
-    # Configurar Selenium con Chrome en modo headless
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
     # Navegar a la URL
     driver.get(url)
@@ -1818,13 +1745,16 @@ def hdu_ocho(url):
     driver.quit()
 
 def hdu_nueve(url):
-    response = asyncio.get_event_loop().run_until_complete(get_page(url))
     # Configurar Selenium con Chrome en modo headless
     chrome_options = Options()
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    # Crear un directorio para almacenar las capturas de pantalla si no existe
+    if not os.path.exists('screenshots'):
+        os.makedirs('screenshots')
 
     # Medición del tiempo de carga de la página
     start_time = time.time()
@@ -1835,101 +1765,128 @@ def hdu_nueve(url):
     else:
         print(f"Advertencia: La página tardó {load_time:.2f} segundos en cargar, excediendo el límite de 5 segundos.")
 
+    # Lista para almacenar mensajes ya mostrados
+    shown_messages = []
+
+    def show_message(message):
+        """Función para verificar si un mensaje ya fue mostrado."""
+        if message not in shown_messages:
+            print(message)
+            shown_messages.append(message)
+
+    def save_screenshot(element, name):
+        """Guardar la captura de pantalla del elemento."""
+        try:
+            element.screenshot(f"screenshots/{name}.png")
+            print(f"Captura de pantalla guardada para '{name}'.")
+        except Exception as e:
+            print(f"Error al guardar la captura de pantalla para '{name}': {e}")
+
     # 61. Comprobación del Tamaño de la Caja de Búsqueda
     try:
         search_box = driver.find_element(By.CSS_SELECTOR, '.search-box')
         search_box_width = search_box.size['width']
 
         if search_box_width >= 300:
-            print(f"La caja de búsqueda es lo suficientemente grande: {search_box_width}px de ancho.")
+            show_message(f"La caja de búsqueda es lo suficientemente grande: {search_box_width}px de ancho.")
+            save_screenshot(search_box, 'caja_busqueda')
         else:
-            print(f"Advertencia: La caja de búsqueda es pequeña: {search_box_width}px de ancho.")
+            show_message(f"Advertencia: La caja de búsqueda es pequeña: {search_box_width}px de ancho.")
+            save_screenshot(search_box, 'caja_busqueda_pequena')
     except NoSuchElementException:
-        print("No se pudo encontrar la caja de búsqueda para verificar su tamaño.")
+        show_message("No se pudo encontrar la caja de búsqueda para verificar su tamaño.")
 
     # 62. Verificación del Espaciado y Tamaño de los Elementos Clickeables
     clickable_elements = driver.find_elements(By.CSS_SELECTOR, 'button, a, input[type="submit"], input[type="button"]')
     for elem in clickable_elements:
-        size = elem.size
-        location = elem.location
-        if size['width'] >= 44 and size['height'] >= 44:
-            print(f"Elemento clickeable de tamaño adecuado: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
-        else:
-            print(f"Advertencia: Elemento clickeable pequeño: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
+        try:
+            elem_id = elem.get_attribute('id') or elem.get_attribute('name') or elem.text
+            if elem_id:
+                size = elem.size
+                location = elem.location
+                if size['width'] >= 44 and size['height'] >= 44:
+                    show_message(f"Elemento clickeable de tamaño adecuado: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
+                    save_screenshot(elem, f'elemento_clickeable_{elem_id}')
+                else:
+                    show_message(f"Advertencia: Elemento clickeable pequeño: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
+                    save_screenshot(elem, f'elemento_clickeable_pequeno_{elem_id}')
 
-        # Verificación de espaciado alrededor
-        elements_around = driver.find_elements(By.XPATH, f"//body//*[not(self::script)][not(self::style)][contains(@style, 'position: absolute') and not(contains(@class, 'ignored'))]")
-        for nearby_elem in elements_around:
-            nearby_location = nearby_elem.location
-            if abs(location['x'] - nearby_location['x']) < 20 and abs(location['y'] - nearby_location['y']) < 20:
-                print(f"Advertencia: Elemento clickeable {elem.tag_name} podría tener un espaciado insuficiente.")
+                # Verificación de espaciado alrededor
+                elements_around = driver.find_elements(By.XPATH, f"//body//*[not(self::script)][not(self::style)]")
+                for nearby_elem in elements_around:
+                    nearby_location = nearby_elem.location
+                    if abs(location['x'] - nearby_location['x']) < 20 and abs(location['y'] - nearby_location['y']) < 20:
+                        show_message(f"Advertencia: Elemento clickeable {elem.tag_name} podría tener un espaciado insuficiente.")
+                        save_screenshot(nearby_elem, f'elemento_cercano_{elem_id}')
+        except StaleElementReferenceException:
+            show_message(f"Advertencia: El elemento '{elem.tag_name}' ya no es válido en el DOM.")
 
     # 63. Verificación de la Presencia y Adecuación de la Ayuda Contextual
     try:
         help_elements = driver.find_elements(By.CSS_SELECTOR, '.help, .tooltip, .hint, [title], [aria-label]')
-        visible_help_elements = [elem for elem in help_elements if elem.is_displayed()]
-
-        if visible_help_elements:
-            print(f"Se encontraron {len(visible_help_elements)} elementos de ayuda contextual visibles.")
-            for elem in visible_help_elements:
-                intentos = 3  # Intentar manejar el error de referencia obsoleta
-                while intentos > 0:
-                    try:
-                        elem = driver.find_element(By.XPATH, f"//*[@title='{elem.get_attribute('title')}'] | //*[@aria-label='{elem.get_attribute('aria-label')}']")
-                        elem.click()
-                        print(f"Elemento de ayuda '{elem.get_attribute('title') or elem.text}' es funcional.")
-                        break
-                    except StaleElementReferenceException:
-                        intentos -= 1
-                        if intentos == 0:
-                            print(f"Advertencia: El elemento de ayuda '{elem.get_attribute('title') or elem.text}' ya no es válido en el DOM después de múltiples intentos.")
-                    except Exception as e:
-                        print(f"Advertencia: El elemento de ayuda '{elem.get_attribute('title') or elem.text}' no respondió al clic. Error: {e}")
-                        break
+        if help_elements:
+            show_message(f"Se encontraron {len(help_elements)} elementos de ayuda contextual visibles.")
+            for elem in help_elements:
+                try:
+                    elem_id = elem.get_attribute('title') or elem.get_attribute('aria-label') or elem.text
+                    if elem_id:
+                        show_message(f"Elemento de ayuda detectado: {elem_id}")
+                        save_screenshot(elem, f'elemento_ayuda_{elem_id}')
+                        elem.click()  # Intentamos interactuar con el elemento.
+                except StaleElementReferenceException:
+                    show_message(f"Advertencia: El elemento de ayuda '{elem_id}' ya no es válido en el DOM.")
+                except Exception as e:
+                    show_message(f"Advertencia: Error interactuando con el elemento '{elem_id}'. Error: {e}")
         else:
-            print("No se encontró ayuda contextual visible en la página.")
+            show_message("No se encontró ayuda contextual visible en la página.")
     except NoSuchElementException:
-        print("Error al buscar elementos de ayuda contextual.")
+        show_message("Error al buscar elementos de ayuda contextual.")
 
     # 64. Revisión de Enlaces y Textos Descriptivos para Evitar Texto Genérico
     generic_phrases = ["Click aquí", "Más información", "Haz clic aquí", "Leer más", "Ver detalles"]
     links = driver.find_elements(By.TAG_NAME, 'a')
 
     for link in links:
-        link_text = link.text.strip()
-        if not link_text:
-            print("Advertencia: Enlace sin texto visible o solo con espacios detectado.")
-        else:
-            if any(phrase.lower() in link_text.lower() for phrase in generic_phrases):
-                print(f"Advertencia: Enlace con texto genérico encontrado: {link_text}")
+        try:
+            link_text = link.text.strip()
+            if not link_text:
+                show_message("Advertencia: Enlace sin texto visible o solo con espacios detectado.")
             else:
-                print(f"Enlace con texto descriptivo adecuado: {link_text}")
+                if any(phrase.lower() in link_text.lower() for phrase in generic_phrases):
+                    show_message(f"Advertencia: Enlace con texto genérico encontrado: {link_text}")
+                    save_screenshot(link, f'enlace_generico_{link_text}')
+                else:
+                    show_message(f"Enlace con texto descriptivo adecuado: {link_text}")
+                    save_screenshot(link, f'enlace_descriptivo_{link_text}')
 
-            title_attr = link.get_attribute('title')
-            aria_label = link.get_attribute('aria-label')
-            if title_attr or aria_label:
-                print(f"Enlace mejorado con atributo de accesibilidad: title='{title_attr}', aria-label='{aria_label}'")
+                title_attr = link.get_attribute('title')
+                aria_label = link.get_attribute('aria-label')
+                if title_attr or aria_label:
+                    show_message(f"Enlace mejorado con atributo de accesibilidad: title='{title_attr}', aria-label='{aria_label}'")
+        except StaleElementReferenceException:
+            show_message(f"Advertencia: El enlace '{link.text}' ya no es válido en el DOM.")
 
     # Cerrar el driver
     driver.quit()
 
-# Ejecutar el análisis en una URL específica
-print("------------------------------------------HISTORIA DE USUARIO 1.1------------------------------------------")
-hdu_uno('http://www.cantinachichilo.com.ar/')
-print("------------------------------------------HISTORIA DE USUARIO 1.2------------------------------------------")
-hdu_dos('http://www.cantinachichilo.com.ar/')
-print("------------------------------------------HISTORIA DE USUARIO 1.3------------------------------------------")
-hdu_tres('http://www.cantinachichilo.com.ar/')
-print("------------------------------------------HISTORIA DE USUARIO 1.4------------------------------------------")
-hdu_cuatro('http://www.cantinachichilo.com.ar/')
-print("------------------------------------------HISTORIA DE USUARIO 1.5------------------------------------------")
-hdu_cinco('http://www.cantinachichilo.com.ar/')
-print("------------------------------------------HISTORIA DE USUARIO 1.6------------------------------------------")
-hdu_seis('http://www.cantinachichilo.com.ar/')
-print("------------------------------------------HISTORIA DE USUARIO 1.7------------------------------------------")
-hdu_siete('http://www.cantinachichilo.com.ar/')
-print("------------------------------------------HISTORIA DE USUARIO 1.8------------------------------------------")
-hdu_ocho('http://www.cantinachichilo.com.ar/')
-print("------------------------------------------HISTORIA DE USUARIO 1.9------------------------------------------")
-hdu_nueve('http://www.cantinachichilo.com.ar/')
+for categoria in categorias:
+    if categoria == "Pagina de Inicio":
+        hdu_uno(url)
+    elif categoria == "Orientación de Tareas":
+        hdu_dos(url)
+    elif categoria ==  "Navegabilidad":
+        hdu_tres(url)
+    elif categoria ==   "Formularios":
+        hdu_cuatro(url)
+    elif categoria ==  "Confianza y Credibilidad":
+        hdu_cinco(url)
+    elif categoria ==   "Calidad del Contenido":
+        hdu_seis(url)
+    elif categoria ==   "Diagramación y Diseño":
+        hdu_siete(url)
+    elif categoria ==  "Sección de Búsquedas":
+        hdu_ocho(url)
+    elif categoria == "Sección de Reconocimiento de Errores y Retroalimentación":
+        hdu_nueve(url)
 
+driver.quit()

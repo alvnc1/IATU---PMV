@@ -1,0 +1,12 @@
+Bounding Box 8:
+ - Clase: image
+ - Confianza: 0.92
+ - Dimensiones: 73x66 píxeles
+ - Área de la bounding box: 4818 píxeles cuadrados
+ - Relación de aspecto: 1.11
+ - Centro de la bounding box: (436.5, 375.0)
+ - Cobertura en la imagen original: 0.52%
+ - Brillo promedio: 217.38
+ - Contraste: 255
+ - Desviación estándar del brillo: 64.57
+ - Perímetro de la bounding box: 278 píxeles

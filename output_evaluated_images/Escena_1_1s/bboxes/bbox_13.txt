@@ -1,0 +1,12 @@
+Bounding Box 13:
+ - Clase: image
+ - Confianza: 0.89
+ - Dimensiones: 67x59 píxeles
+ - Área de la bounding box: 3953 píxeles cuadrados
+ - Relación de aspecto: 1.14
+ - Centro de la bounding box: (969.5, 309.5)
+ - Cobertura en la imagen original: 0.43%
+ - Brillo promedio: 218.59
+ - Contraste: 255
+ - Desviación estándar del brillo: 60.56
+ - Perímetro de la bounding box: 252 píxeles

@@ -1,0 +1,12 @@
+Bounding Box 17:
+ - Clase: image
+ - Confianza: 0.85
+ - Dimensiones: 75x68 píxeles
+ - Área de la bounding box: 5100 píxeles cuadrados
+ - Relación de aspecto: 1.10
+ - Centro de la bounding box: (568.5, 373.0)
+ - Cobertura en la imagen original: 0.55%
+ - Brillo promedio: 158.82
+ - Contraste: 255
+ - Desviación estándar del brillo: 85.43
+ - Perímetro de la bounding box: 286 píxeles

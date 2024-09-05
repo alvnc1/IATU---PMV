@@ -1,0 +1,12 @@
+Bounding Box 15:
+ - Clase: image
+ - Confianza: 0.87
+ - Dimensiones: 55x64 píxeles
+ - Área de la bounding box: 3520 píxeles cuadrados
+ - Relación de aspecto: 0.86
+ - Centro de la bounding box: (833.5, 376.0)
+ - Cobertura en la imagen original: 0.38%
+ - Brillo promedio: 198.79
+ - Contraste: 255
+ - Desviación estándar del brillo: 69.01
+ - Perímetro de la bounding box: 238 píxeles

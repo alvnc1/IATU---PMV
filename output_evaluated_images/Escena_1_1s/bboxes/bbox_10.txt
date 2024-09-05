@@ -1,0 +1,12 @@
+Bounding Box 10:
+ - Clase: image
+ - Confianza: 0.90
+ - Dimensiones: 53x65 píxeles
+ - Área de la bounding box: 3445 píxeles cuadrados
+ - Relación de aspecto: 0.82
+ - Centro de la bounding box: (834.5, 309.5)
+ - Cobertura en la imagen original: 0.37%
+ - Brillo promedio: 197.72
+ - Contraste: 255
+ - Desviación estándar del brillo: 69.74
+ - Perímetro de la bounding box: 236 píxeles

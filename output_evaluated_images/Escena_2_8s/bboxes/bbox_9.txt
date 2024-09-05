@@ -1,0 +1,12 @@
+Bounding Box 9:
+ - Clase: image
+ - Confianza: 0.90
+ - Dimensiones: 85x110 píxeles
+ - Área de la bounding box: 9350 píxeles cuadrados
+ - Relación de aspecto: 0.77
+ - Centro de la bounding box: (698.5, 625.0)
+ - Cobertura en la imagen original: 1.01%
+ - Brillo promedio: 217.65
+ - Contraste: 255
+ - Desviación estándar del brillo: 71.26
+ - Perímetro de la bounding box: 390 píxeles
