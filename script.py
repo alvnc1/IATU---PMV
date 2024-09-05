@@ -1,6 +1,7 @@
 import cv2
 import os
 import sys
+import shutil
 from flask import jsonify
 from fpdf import FPDF
 from requests import request
@@ -10,7 +11,9 @@ from IPython.display import display, Image
 import subprocess
 from inference_sdk import InferenceHTTPClient
 from dataclasses import dataclass
-
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import StaleElementReferenceException, TimeoutException
 from requests_html import AsyncHTMLSession
 import time
 import re
@@ -50,7 +53,6 @@ if not os.path.exists(output_folder):
 video_path = sys.argv[1]
 url = sys.argv[2]
 categorias = sys.argv[3].split(',')
-name = sys.argv[4]
 
 print(video_path)
 print(url)
@@ -456,7 +458,7 @@ def hdu_uno(url):
             pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 8, mensaje)
 
-    driver.quit()
+    #driver.quit()
     
 
 def obtener_atributo_safe(elemento, atributo, max_intentos=3):
@@ -796,7 +798,7 @@ def hdu_dos(url):
         pdf.set_x(15)
         pdf.multi_cell(200,10,txt= "- No se encontraron formularios con autocompletar ni con botones de acción rápida, podría considerarse una oportunidad de mejora en la usabilidad.")
         #print("No se encontraron formularios con autocompletar ni con botones de acción rápida, podría considerarse una oportunidad de mejora en la usabilidad.")
-    driver.quit()
+    #driver.quit()
 
 def hdu_tres(url):
     # Navegar a la URL
@@ -806,9 +808,10 @@ def hdu_tres(url):
 
     pdf.set_font("Arial", size=11)
 
+
     pdf.cell(200, 10, txt="Navegabilidad", align='C')
-
-
+    
+    pdf.ln(10)
     # --- Verificación de menús de navegación y enlaces visibles ---
     selectors = ['nav', 'ul', 'ol', '.menu', '.navbar', '.navigation']
     navigation_menus = []
@@ -1113,7 +1116,7 @@ def hdu_tres(url):
         print(f"Error al verificar páginas de ayuda o mensajes de error: {str(e)}")
 
     # Cerrar el driver
-    driver.quit()
+    #driver.quit()
 
 def hdu_cuatro(url):
 
@@ -1122,6 +1125,8 @@ def hdu_cuatro(url):
     pdf.set_font("Arial", size=11)
 
     pdf.cell(200, 10, txt="Formularios", align='C')
+    
+    pdf.ln(10)
 
     # Navegar a la URL
     driver.get(url)
@@ -1631,6 +1636,7 @@ def hdu_cinco(url):
     pdf.set_font("Arial", size=11)
 
     pdf.cell(200, 10, txt="Confianza y Credibilidad", ln=True, align='C')
+    pdf.ln(10)
 
     pdf.set_font("Arial", size=10)
 
@@ -1713,17 +1719,18 @@ def hdu_cinco(url):
 
     # Combinar errores comunes con palabras mal escritas
     found_errors = misspelled.union(set(word for word in common_mistakes if word in words))
+    found_errors_list = list(found_errors)
 
-    if found_errors:
-        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+    if found_errors_list:
+        pdf.set_font("Arial", size=8)  # Añadimos un salto de línea
         pdf.set_x(15)
-        pdf.multi_cell(200, 10, txt=f"- Se detectaron palabras desconocidas, alguna(s) podría(n) ser errores: {', '.join(map(str, found_errors[0:5]))}")
-        #print(f"Se detectaron errores tipográficos u ortográficos: {found_errors}")
+        # Corregir la cadena que genera el error
+        pdf.multi_cell(200, 10, txt=f"- Se detectaron palabras desconocidas, alguna(s) podría(n) ser errores: {', '.join(map(str, found_errors_list[:5]))}")
     else:
-        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_font("Arial", size=8)  # Añadimos un salto de línea
         pdf.set_x(15)
-        pdf.multi_cell(200,10,txt= "- No se detectaron errores tipográficos u ortográficos que requieran atención inmediata.")
-        #print("No se detectaron errores tipográficos u ortográficos.")
+        pdf.multi_cell(200, 10, txt="- No se detectaron errores tipográficos u ortográficos que requieran atención inmediata.")
+            #print("No se detectaron errores tipográficos u ortográficos.")
 
     pdf.set_font("Arial", size=10)
     pdf.cell(200, 10, txt="Listas y Viñetas:", ln=True, align='L')
@@ -1885,7 +1892,7 @@ def hdu_cinco(url):
             #print("Todas las listas numeradas comienzan en 1.")
 
     # Cerrar el driver
-    driver.quit()
+    #driver.quit()
 
 def hdu_seis(url):
 
@@ -1893,6 +1900,7 @@ def hdu_seis(url):
     pdf.set_font("Arial", size=11)
     pdf.multi_cell(200,10,txt= "Calidad del Contenido",align='C')
 
+    pdf.ln(10)
     # Navegar a la URL
     driver.get(url)
 
@@ -1946,7 +1954,10 @@ def hdu_seis(url):
             pdf.multi_cell(200,10,txt= "- Se detectaron posibles problemas en la jerarquía de encabezados.")
             #print("Se detectaron posibles problemas en la jerarquía de encabezados.")
     else:
-        print("No se encontraron encabezados, posible falta de estructura jerárquica en el contenido.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= "- No se encontraron encabezados, posible falta de estructura jerárquica en el contenido.")
+        #print("No se encontraron encabezados, posible falta de estructura jerárquica en el contenido.")
 
     # 37. Análisis de la Estructura de las Páginas para Mejorar la Legibilidad
     large_titles = driver.find_elements(By.CSS_SELECTOR, 'h1')
@@ -1961,11 +1972,20 @@ def hdu_seis(url):
             pdf.multi_cell(200,10,txt= f"- Se detectaron {len(long_paragraphs)} párrafos largos. Considera dividirlos para mejorar la legibilidad.")
             #print(f"Se detectaron {len(long_paragraphs)} párrafos largos. Considera dividirlos para mejorar la legibilidad.")
         else:
-            print("Los párrafos son cortos y adecuados para la legibilidad.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200,10,txt= f"- Los párrafos son cortos y adecuados para la legibilidad.")
+            #print("Los párrafos son cortos y adecuados para la legibilidad.")
 
-        print("La página contiene títulos grandes, subtítulos y párrafos cortos, lo que mejora la legibilidad.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= f"- La página contiene títulos grandes, subtítulos y párrafos cortos, lo que mejora la legibilidad.")
+        #print("La página contiene títulos grandes, subtítulos y párrafos cortos, lo que mejora la legibilidad.")
     else:
-        print("La estructura de la página podría no estar optimizada para la legibilidad.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200,10,txt= f"- La estructura de la página podría no estar optimizada para la legibilidad.")
+        #print("La estructura de la página podría no estar optimizada para la legibilidad.")
 
     # 38. Análisis de la Longitud y Descriptividad de Títulos y Subtítulos
     title_threshold = 60  # Definir un umbral para la longitud de los títulos
@@ -2005,7 +2025,7 @@ def hdu_seis(url):
             print(f"Subtítulo descriptivo adecuado: {subtitle.text}")
 
     # Cerrar el driver
-    driver.quit()
+    #driver.quit()
 
 def hdu_siete(url):
 
@@ -2018,6 +2038,8 @@ def hdu_siete(url):
     pdf.set_font("Arial", size=11)
 
     pdf.cell(200, 10, txt="Diagramación y Diseño", align='C')
+    
+    pdf.ln(10)
 
     # Funciones auxiliares
     def rgb_or_rgba_to_tuple(color_str):
@@ -2156,12 +2178,13 @@ def hdu_siete(url):
             pdf.multi_cell(200,10,txt= f"- Advertencia: Otros problemas detectados: - {item}")
             #print(f"- {item}")
     # Cerrar el driver
-    driver.quit()
+    #driver.quit()
 
 def hdu_ocho(url):
     # Navegar a la URL
     driver.get(url)
     
+    pdf.ln(10)
     pdf.set_font("Arial", size=11)
 
     pdf.cell(200, 10, txt="Sección de Búsquedas", align='C')
@@ -2366,39 +2389,27 @@ def hdu_ocho(url):
         print("No se pudo verificar la existencia de resultados duplicados o similares.")
 
     # Cerrar el driver
-    driver.quit()
+    #driver.quit()
 
 
-def hdu_nueve(url):
-    
+def hdu_nueve(url): 
     pdf.ln(10)
     pdf.set_font("Arial", size=11)
+    
     pdf.cell(200, 10, txt="Sección de Reconocimiento de Errores y Retroalimentación", align='C')
-    # Configurar Selenium con Chrome en modo headless
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-
-    # Crear un directorio para almacenar las capturas de pantalla si no existe
-    if not os.path.exists('screenshots'):
-        os.makedirs('screenshots')
+    pdf.ln(10)
+    
+    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+    pdf.set_x(15) 
 
     # Medición del tiempo de carga de la página
     start_time = time.time()
     driver.get(url)
     load_time = time.time() - start_time
     if load_time <= 5:
-        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-        pdf.multi_cell(200,10,txt= f"La página se cargó en {load_time:.2f} segundos, dentro del límite aceptable.")
-        #print(f"La página se cargó en {load_time:.2f} segundos, dentro del límite aceptable.")
+        pdf.multi_cell(200,10,txt= f"- La página se cargó en {load_time:.2f} segundos, dentro del límite aceptable.")
     else:
-        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-        pdf.multi_cell(200,10,txt= f"Advertencia: La página tardó {load_time:.2f} segundos en cargar, excediendo el límite de 5 segundos.")
-        #print(f"Advertencia: La página tardó {load_time:.2f} segundos en cargar, excediendo el límite de 5 segundos.")
+        pdf.multi_cell(200,10,txt= f"- Advertencia: La página tardó {load_time:.2f} segundos en cargar, excediendo el límite de 5 segundos.")
 
     # Lista para almacenar mensajes ya mostrados
     shown_messages = []
@@ -2406,148 +2417,73 @@ def hdu_nueve(url):
     def show_message(message):
         """Función para verificar si un mensaje ya fue mostrado."""
         if message not in shown_messages:
-            print(message)
+            pdf.multi_cell(200,10,txt=message)
             shown_messages.append(message)
 
-    def save_screenshot(element, name):
-        """Guardar la captura de pantalla del elemento."""
-        try:
-            element.screenshot(f"screenshots/{name}.png")
-            print(f"Captura de pantalla guardada para '{name}'.")
-        except Exception as e:
-            print(f"Error al guardar la captura de pantalla para '{name}': {e}")
-
-    # 61. Comprobación del Tamaño de la Caja de Búsqueda
+    # 61. Comprobación del Tamaño de la Caja de Búsqueda con límite de tiempo
     try:
-        search_box = driver.find_element(By.CSS_SELECTOR, '.search-box')
+        search_box = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, '.search-box')))
         search_box_width = search_box.size['width']
-
         if search_box_width >= 300:
-            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(200,10,txt=f"- La caja de búsqueda es lo suficientemente grande: {search_box_width}px de ancho.")
-            #show_message(f"La caja de búsqueda es lo suficientemente grande: {search_box_width}px de ancho.")
-            save_screenshot(search_box, 'caja_busqueda')
         else:
-            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(200,10,txt=f"- Advertencia: La caja de búsqueda es pequeña: {search_box_width}px de ancho.")
-            #show_message(f"Advertencia: La caja de búsqueda es pequeña: {search_box_width}px de ancho.")
-            save_screenshot(search_box, 'caja_busqueda_pequena')
-    except NoSuchElementException:
-        show_message("No se pudo encontrar la caja de búsqueda para verificar su tamaño.")
+    except (NoSuchElementException, TimeoutException):
+        pdf.multi_cell(200,10,"- No se pudo encontrar la caja de búsqueda para verificar su tamaño.")
 
-    # 62. Verificación del Espaciado y Tamaño de los Elementos Clickeables
-    clickable_elements = driver.find_elements(By.CSS_SELECTOR, 'button, a, input[type="submit"], input[type="button"]')
+    # 62. Verificación del Espaciado y Tamaño de los Elementos Clickeables con límite de elementos
+    clickable_elements = driver.find_elements(By.CSS_SELECTOR, 'button, a, input[type="submit"], input[type="button"]')[:20]  # Limitar a 20 elementos
     for elem in clickable_elements:
         try:
             elem_id = elem.get_attribute('id') or elem.get_attribute('name') or elem.text
-            if elem_id:
-                size = elem.size
-                location = elem.location
-                if size['width'] >= 44 and size['height'] >= 44:
-                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                    pdf.multi_cell(200,10,txt=f"- Elemento clickeable de tamaño adecuado: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
-                    #show_message(f"Elemento clickeable de tamaño adecuado: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
-                    save_screenshot(elem, f'elemento_clickeable_{elem_id}')
-                else:
-                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                    pdf.multi_cell(200,10,txt=f"- Advertencia: Elemento clickeable pequeño: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
-                    #show_message(f"Advertencia: Elemento clickeable pequeño: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
-                    save_screenshot(elem, f'elemento_clickeable_pequeno_{elem_id}')
+            size = elem.size
+            location = elem.location
+            if size['width'] >= 44 and size['height'] >= 44:
+                pdf.multi_cell(200,10,txt=f"- Elemento clickeable de tamaño adecuado: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
+            else:
+                pdf.multi_cell(200,10,txt=f"- Advertencia: Elemento clickeable pequeño: {elem.tag_name} con tamaño {size['width']}x{size['height']}.")
 
-                # Verificación de espaciado alrededor
-                elements_around = driver.find_elements(By.XPATH, f"//body//*[not(self::script)][not(self::style)]")
-                for nearby_elem in elements_around:
-                    nearby_location = nearby_elem.location
-                    if abs(location['x'] - nearby_location['x']) < 20 and abs(location['y'] - nearby_location['y']) < 20:
-                        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                        pdf.multi_cell(200,10,txt=f"- Advertencia: Elemento clickeable {elem.tag_name} podría tener un espaciado insuficiente.")
-                        #show_message(f"Advertencia: Elemento clickeable {elem.tag_name} podría tener un espaciado insuficiente.")
-                        save_screenshot(nearby_elem, f'elemento_cercano_{elem_id}')
+            # Verificación de espaciado alrededor con límite
+            elements_around = driver.find_elements(By.XPATH, f"//body//*[not(self::script)][not(self::style)]")[:10]
+            for nearby_elem in elements_around:
+                nearby_location = nearby_elem.location
+                if abs(location['x'] - nearby_location['x']) < 20 and abs(location['y'] - nearby_location['y']) < 20:
+                    pdf.multi_cell(200,10,txt=f"- Advertencia: Elemento clickeable {elem.tag_name} podría tener un espaciado insuficiente.")
         except StaleElementReferenceException:
-            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(200,10,txt=f"- Advertencia: El elemento '{elem.tag_name}' ya no es válido en el DOM.")
-            #show_message(f"Advertencia: El elemento '{elem.tag_name}' ya no es válido en el DOM.")
 
-    # 63. Verificación de la Presencia y Adecuación de la Ayuda Contextual
+    # 63. Verificación de la Presencia y Adecuación de la Ayuda Contextual con límite
     try:
-        help_elements = driver.find_elements(By.CSS_SELECTOR, '.help, .tooltip, .hint, [title], [aria-label]')
+        help_elements = driver.find_elements(By.CSS_SELECTOR, '.help, .tooltip, .hint, [title], [aria-label]')[:10]  # Limitar a 10 elementos
         if help_elements:
-            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(200,10,txt=f"- Se encontraron {len(help_elements)} elementos de ayuda contextual visibles.")
-            #show_message(f"Se encontraron {len(help_elements)} elementos de ayuda contextual visibles.")
             for elem in help_elements:
                 try:
                     elem_id = elem.get_attribute('title') or elem.get_attribute('aria-label') or elem.text
-                    if elem_id:
-                        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                        pdf.multi_cell(200,10,txt=f"- Elemento de ayuda detectado: {elem_id}")
-                        #show_message(f"Elemento de ayuda detectado: {elem_id}")
-                        save_screenshot(elem, f'elemento_ayuda_{elem_id}')
-                        elem.click()  # Intentamos interactuar con el elemento.
+                    pdf.multi_cell(200,10,txt=f"- Elemento de ayuda detectado: {elem_id}")
                 except StaleElementReferenceException:
-                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
                     pdf.multi_cell(200,10,txt=f"- Advertencia: El elemento de ayuda '{elem_id}' ya no es válido en el DOM.")
-                    #show_message(f"Advertencia: El elemento de ayuda '{elem_id}' ya no es válido en el DOM.")
-                except Exception as e:
-                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                    pdf.multi_cell(200,10,txt=f"- Advertencia: Error interactuando con el elemento '{elem_id}'. Error: {e}")
-                    #show_message(f"Advertencia: Error interactuando con el elemento '{elem_id}'. Error: {e}")
-        else:
-            show_message("No se encontró ayuda contextual visible en la página.")
     except NoSuchElementException:
-        show_message("Error al buscar elementos de ayuda contextual.")
+        pdf.multi_cell(200,10,"Error al buscar elementos de ayuda contextual.")
 
     # 64. Revisión de Enlaces y Textos Descriptivos para Evitar Texto Genérico
     generic_phrases = ["Click aquí", "Más información", "Haz clic aquí", "Leer más", "Ver detalles"]
-    links = driver.find_elements(By.TAG_NAME, 'a')
-
+    links = driver.find_elements(By.TAG_NAME, 'a')[:20]  # Limitar a 20 enlaces
     for link in links:
         try:
             link_text = link.text.strip()
             if not link_text:
-                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
                 pdf.multi_cell(200,10,txt="- Advertencia: Enlace sin texto visible o solo con espacios detectado.")
-                #show_message("Advertencia: Enlace sin texto visible o solo con espacios detectado.")
             else:
                 if any(phrase.lower() in link_text.lower() for phrase in generic_phrases):
-                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
                     pdf.multi_cell(200,10,txt=f"- Advertencia: Enlace con texto genérico encontrado: {link_text}")
-                    #show_message(f"Advertencia: Enlace con texto genérico encontrado: {link_text}")
-                    save_screenshot(link, f'enlace_generico_{link_text}')
                 else:
-                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
                     pdf.multi_cell(200,10,txt=f"- Enlace con texto descriptivo adecuado: {link_text}")
-                    #show_message(f"Enlace con texto descriptivo adecuado: {link_text}")
-                    save_screenshot(link, f'enlace_descriptivo_{link_text}')
-
-                title_attr = link.get_attribute('title')
-                aria_label = link.get_attribute('aria-label')
-                if title_attr or aria_label:
-                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                    pdf.multi_cell(200,10,txt=f"- Enlace mejorado con atributo de accesibilidad: title='{title_attr}', aria-label='{aria_label}'")
-                    #show_message(f"Enlace mejorado con atributo de accesibilidad: title='{title_attr}', aria-label='{aria_label}'")
         except StaleElementReferenceException:
-            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(200,10,txt=f"- Advertencia: El enlace '{link.text}' ya no es válido en el DOM.")
-            #show_message(f"Advertencia: El enlace '{link.text}' ya no es válido en el DOM.")
-
+    
     # Cerrar el driver
-    driver.quit()
+    #driver.quit()
 
 for categoria in categorias:
     if categoria == "Página de Inicio":
@@ -2571,3 +2507,5 @@ for categoria in categorias:
 
 driver.quit()
 pdf.output(f"public/informe.pdf")
+shutil.rmtree('capturas')
+shutil.rmtree('output_evaluated_images')

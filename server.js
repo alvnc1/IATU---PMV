@@ -12,17 +12,17 @@ app.use(cors({
 app.use(express.json());
 
 app.post('/run-python', (req, res) => {
-    const { videoUrl, urlTarea, categorias , nameTask} = req.body;
+    const { videoUrl, urlTarea, categorias } = req.body;
 
     if (!videoUrl || !urlTarea || !categorias) {
         return res.status(400).json({ error: 'Video URL, URL de la Tarea y Categorías son requeridos' });
     }
 
     // Log para ver los datos recibidos
-    console.log(`Datos recibidos - videoUrl: ${videoUrl}, urlTarea: ${urlTarea}, categorias: ${categorias}, nameTask: ${nameTask}` );
+    console.log(`Datos recibidos - videoUrl: ${videoUrl}, urlTarea: ${urlTarea}, categorias: ${categorias}`);
 
     // Ejecutar el proceso de Python
-    const pythonProcess = spawn('python', ['script.py', videoUrl,urlTarea,categorias,nameTask]);
+    const pythonProcess = spawn('python', ['script.py', videoUrl,urlTarea,categorias]);
 
     pythonProcess.stdout.on('data', (data) => {
         console.log(`stdout: ${data}`);

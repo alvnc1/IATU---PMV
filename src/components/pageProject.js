@@ -96,11 +96,9 @@ function ProjectPage() {
     const videoUrl = taskId.files.find(file => file.url).url;
     const urlTarea = taskId.urlTarea;
     const categorias = taskId.categorias;
-    const nameTask = taskId.nombreTarea;
     console.log(videoUrl);
     console.log(urlTarea);
     console.log(categorias);
-    console.log(nameTask);
 
     // Verificar que todos los valores están presentes
     if (!videoUrl || !urlTarea || !categorias) {
@@ -118,7 +116,7 @@ function ProjectPage() {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ videoUrl, urlTarea, categorias , nameTask})
+      body: JSON.stringify({ videoUrl, urlTarea, categorias })
     })
     .then(response => response.json())
     .then(data => {
