@@ -10,6 +10,7 @@ import { MdSave } from "react-icons/md";
 import { db, storage } from "./firebase"; 
 import { doc, setDoc, collection } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"; 
+import { getAuth } from "firebase/auth";
 
 function NewProject() {
     const [nombreProyecto, setNombreProyecto] = useState('');
@@ -20,6 +21,8 @@ function NewProject() {
     const [uploadStatus, setUploadStatus] = useState({});
     const [selectedCategorias, setSelectedCategorias] = useState([]);
     const navigate = useNavigate();
+
+    const auth = getAuth();  // Inicializamos Firebase Auth
 
     const categorias = [
         "Página de Inicio",
@@ -92,13 +95,22 @@ function NewProject() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Crear y guardar el proyecto
+            const user = auth.currentUser;  // Obtener el usuario autenticado
+            if (!user) {
+                alert("Usuario no autenticado.");
+                return;
+            }
+
+            const userId = user.uid;  // Obtener el UID del usuario
             const proyectoRef = doc(collection(db, "proyectos"));
+
             const proyectoData = {
                 nombreProyecto,
                 descripcionProyecto,
-                fechaCreacion: new Date().toISOString()
+                fechaCreacion: new Date().toISOString(),
+                userId // Almacenamos el UID del usuario junto con los datos del proyecto
             };
+
             await setDoc(proyectoRef, proyectoData);
 
             // Luego crear y guardar la tarea dentro del proyecto recién creado

@@ -183,7 +183,7 @@ function ProjectPage() {
                 <tr key={task.id}>
                   <td className="text-truncate">{task.nombreTarea}</td>
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
-                  <td>{testStatus[task.id] || 'Pendiente'}</td>
+                  <td>{testStatus[task.id]}</td>
                   <td>
                       <Button
                         variant="outline-primary"
