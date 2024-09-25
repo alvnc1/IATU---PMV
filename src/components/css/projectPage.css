@@ -1,0 +1,166 @@
+.rounded-table {
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.rounded-table th:first-child, 
+.rounded-table td:first-child {
+  border-left: none;
+}
+
+.rounded-table th:last-child, 
+.rounded-table td:last-child {
+  border-right: none;
+}
+
+.rounded-table th:first-child {
+  border-top-left-radius: 10px;
+}
+
+.rounded-table th:last-child {
+  border-top-right-radius: 10px;
+}
+
+.rounded-table tr:last-child td:first-child {
+  border-bottom-left-radius: 10px;
+}
+
+.rounded-table tr:last-child td:last-child {
+  border-bottom-right-radius: 10px;
+}
+
+.action-buttons {
+  display: flex;
+  align-items: center;
+}
+
+.play-button {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  margin-right: 5px;
+  cursor: pointer;
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  transition: background-color 0.3s ease;
+}
+
+.play-button:hover {
+  background-color: transparent;
+  border-radius: 50%;
+}
+
+.delete-button {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  transition: background-color 0.3s ease;
+}
+
+.delete-button:hover {
+  background-color: transparent;
+  border-radius: 50%;
+}
+
+.pdf-button {
+  color: black;
+  border-color: black;
+}
+
+.pdf-button:hover {
+  background-color: #333;
+  color: white;
+  border-color: #333;
+}
+
+.page-title {
+  margin-left: 20px;
+  margin-top: 16px;
+}
+
+.add-button {
+  border-radius: 12px; /* Ajusta este valor según el nivel de redondez deseado */
+  padding: 6px 12px; /* Ajusta el padding para mantener una buena proporción */
+  transition: background-color 0.3s ease;
+  background-color: #000000;
+  color: #ffffff;
+  border-color: #000000;
+}
+
+.add-button:hover {
+  background-color: #333333;
+  border-color: #333333;
+  color: #ffffff;
+}
+
+.add-button:active {
+  background-color: #333333; /* Color de fondo al hacer clic */
+  border-color: #333333; /* Cambia también el color del borde */
+  color: white; /* Cambia el color del texto */
+}
+
+.add-button:focus {
+  background-color: #000000 !important; /* Color de fondo al hacer clic */
+  border-color: #333 !important; /* Cambia también el color del borde */
+  color: white !important; /* Cambia el color del texto */
+  box-shadow: none !important; /* Elimina el resplandor de enfoque */
+}
+
+
+.progress-bar-container {
+  width: 80%; /* Ajusta el ancho relativo al contenedor */
+  background-color: transparent;
+  border: 2px solid #333333; /* Color del borde */
+  border-radius: 40px; /* Redondear los bordes */
+  height: 30px; /* Ajusta la altura de la barra */
+  overflow: hidden;
+  position: fixed;
+  bottom: 20px; /* Ajuste para separarlo un poco del fondo */
+  left: 55%; /* Coloca el contenedor en el centro */
+  transform: translateX(-50%); /* Centra la barra horizontalmente */
+}
+
+.progress-bar {
+  background-color: #000000; /* Color de relleno */
+  height: 100%;
+  width: 0%; /* Comienza en 0 y crecerá */
+  border-radius: 40px; /* Redondeado del relleno para coincidir con el contenedor */
+  transition: width 1.5s ease; /* Animación suave para el progreso */
+}
+
+.progress-bar-text {
+  color: #000000;
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 16px;
+}
+
+@keyframes progress-animation {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+.table-header {
+  font-weight: bold;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+

@@ -3,8 +3,8 @@ import React, { useState } from "react";
 import { auth } from "./firebase";
 import { toast } from "react-toastify";
 import SignInwithGoogle from "./signInWithGoogle";
-import '../login-register.css';
-import img from './images/logo.png';
+import './css/login-register.css';
+import img from './images/logo_v2_black.png';
 
 function Login() {
   const [email, setEmail] = useState("");
