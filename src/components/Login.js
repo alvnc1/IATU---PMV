@@ -4,7 +4,7 @@ import { auth } from "./firebase";
 import { toast } from "react-toastify";
 import SignInwithGoogle from "./signInWithGoogle";
 import './css/login-register.css';
-import img from './images/logo_v2_black.png';
+import img from './images/logo_black_v3.png';
 
 function Login() {
   const [email, setEmail] = useState("");

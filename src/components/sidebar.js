@@ -6,7 +6,7 @@ import { auth, db } from "./firebase";
 import { doc, getDoc } from "firebase/firestore";
 import './css/Sidebar.css';
 
-import logo from './images/logo_v2.png';
+import logo from './images/logo_white.png';
 
 function Sidebar() {
   const [userDetails, setUserDetails] = useState(null);
