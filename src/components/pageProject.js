@@ -4,7 +4,7 @@ import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
-import { MdDelete, MdPlayArrow, MdAdd } from "react-icons/md";
+import { MdDelete, MdPlayArrow, MdAdd, MdVideoLibrary } from "react-icons/md";
 import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from "./firebase";
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,8 @@ function ProjectPage() {
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [videoUrl, setVideoUrl] = useState(''); // Nuevo estado para la URL del video
+  const [showVideoModal, setShowVideoModal] = useState(false); // Nuevo estado para controlar la visibilidad del modal de video
   const [sortOrder, setSortOrder] = useState('asc');
   const [testStatus, setTestStatus] = useState({});
   const [projectName, setProjectName] = useState(''); 
@@ -80,16 +82,6 @@ function ProjectPage() {
     navigate(`/newTask/${id}`);
   };
 
-  // Función para descargar el PDF
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = process.env.PUBLIC_URL + '/informe.pdf';  // Ruta al PDF en el directorio 'public'
-    link.setAttribute('download', 'informe.pdf');  // Nombre con el que se descargará
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-  
   const handlePlayTask = (taskId) => {
     setIsLoading(true);
 
@@ -100,7 +92,6 @@ function ProjectPage() {
     console.log(urlTarea);
     console.log(categorias);
 
-    // Verificar que todos los valores están presentes
     if (!videoUrl || !urlTarea || !categorias) {
       setIsLoading(false);
       return alert('Faltan datos para ejecutar el análisis');
@@ -121,8 +112,6 @@ function ProjectPage() {
     .then(response => response.json())
     .then(data => {
       console.log('Respuesta del servidor:', data);
-      //alert('Análisis de video completado');
-
       setTestStatus(prevStatus => ({
         ...prevStatus,
         [taskId.id]: 'Finalizado'
@@ -130,8 +119,6 @@ function ProjectPage() {
     })
     .catch(error => {
       console.error('Error al ejecutar el script de Python:', error);
-      //alert('Error al analizar el video');
-
       setTestStatus(prevStatus => ({
         ...prevStatus,
         [taskId.id]: 'Error'
@@ -140,6 +127,32 @@ function ProjectPage() {
     .finally(() => {
       setIsLoading(false);
     });
+  };
+
+  // Función para descargar el PDF
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = process.env.PUBLIC_URL + '/informe.pdf';  // Ruta al PDF en el directorio 'public'
+    link.setAttribute('download', 'informe.pdf');  // Nombre con el que se descargará
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Maneja la reproducción del video
+  const handleShowVideoModal = (task) => {
+    const videoFile = task.files.find(file => file.url);
+    if (videoFile) {
+      setVideoUrl(videoFile.url);
+      setShowVideoModal(true);
+    } else {
+      alert('No se encontró la URL del video.');
+    }
+  };
+
+  const handleCloseVideoModal = () => {
+    setShowVideoModal(false);
+    setVideoUrl('');
   };
 
   useEffect(() => {
@@ -159,14 +172,6 @@ function ProjectPage() {
           </Button>
         </div>
 
-        {/*isLoading && (
-          <div className="progress-bar-container">
-            <div className="progress-bar">
-              <span className="progress-bar-text">Cargando...</span>
-            </div>
-          </div>
-        )*/}
-
         <div style={{ marginTop: '20px' }}>
           <Table striped bordered hover responsive className="rounded-table">
             <thead>
@@ -185,27 +190,19 @@ function ProjectPage() {
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
                   <td>{testStatus[task.id]}</td>
                   <td>
-                      <Button
-                        variant="outline-primary"
-                        onClick={handleDownload}
-                        className="me-2 pdf-button">
-                        PDF
-                      </Button>
+                    <Button variant="outline-primary" onClick={handleDownload} className="me-2 pdf-button">
+                      PDF
+                    </Button>
                   </td>
                   <td>
                     <div className="action-buttons">
-                      <Button 
-                        variant="success" 
-                        onClick={() => handlePlayTask(task)}  
-                        className="play-button"
-                      >
+                      <Button variant="success" onClick={() => handlePlayTask(task)} className="play-button">
                         <MdPlayArrow size={20} />
                       </Button>
-                      <Button 
-                        variant="danger" 
-                        onClick={() => deleteTask(task.id)} 
-                        className="delete-button"
-                      >
+                      <Button variant="success" onClick={() => handleShowVideoModal(task)} className="play-button">
+                        <MdVideoLibrary size={20} />
+                      </Button>
+                      <Button variant="danger" onClick={() => deleteTask(task.id)} className="delete-button">
                         <MdDelete size={20} />
                       </Button>
                     </div>
@@ -238,6 +235,28 @@ function ProjectPage() {
           </Modal.Body>
         </Modal>
       )}
+
+      <Modal show={showVideoModal} onHide={handleCloseVideoModal} size="lg">
+        <Modal.Header closeButton>
+          <Modal.Title>Reproducir Video</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {videoUrl ? (
+            <div className="embed-responsive embed-responsive-16by9">
+              <iframe
+                src={videoUrl}
+                title="Video"
+                width="100%"
+                height="400px"
+                allowFullScreen
+                frameBorder="0"
+              ></iframe>
+            </div>
+          ) : (
+            <p>No se encontró la URL del video.</p>
+          )}
+        </Modal.Body>
+      </Modal>
     </div>
   );
 }
