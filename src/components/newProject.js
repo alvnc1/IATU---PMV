@@ -239,7 +239,7 @@ function NewProject() {
                                     padding: '20px',
                                     textAlign: 'center',
                                     marginBottom: '20px',
-                                    height: '200px',
+                                    height: '180px',
                                     display: 'flex',
                                     justifyContent: 'center',
                                     alignItems: 'center'

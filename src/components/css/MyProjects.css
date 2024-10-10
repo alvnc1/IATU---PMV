@@ -139,3 +139,61 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+
+/* Estilos personalizados para el hover del Dropdown */
+.dropdown-menu .dropdown-item:hover,
+.dropdown-menu .dropdown-item:focus {
+  background-color: #e0e0e0; /* Cambia el color a gris */
+  color: #333; /* Cambia el color del texto si es necesario */
+}
+
+
+/* Estilos para el modal de compartir proyectos */
+.share-modal .modal-body h5 {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.share-modal .user-list {
+  margin-bottom: 1.5rem;
+}
+
+.share-modal .user-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.share-modal .user-item .user-email {
+  font-size: 14px;
+  color: #333;
+  margin-right: 150px;
+  flex-grow: 1;
+}
+
+.share-modal .user-item .status-btn {
+  padding: 0.2rem 0.8rem;
+  border-radius: 20px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.share-modal .user-item .status-btn.access {
+  background-color: #17884a;
+  color: white;
+  border: none;
+}
+
+.share-modal .user-item .status-btn.share {
+  background-color: #333;
+  color: white;
+  border: none;
+}
+
+.share-modal .user-item .status-btn:hover {
+  opacity: 0.9;
+}
