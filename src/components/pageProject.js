@@ -133,6 +133,9 @@ function ProjectPage() {
     const link = document.createElement('a');
     link.href = pdfUrl;
   
+    // Abrir en una nueva ventana o pestaña
+    link.target = '_blank';
+
     // Forzar la descarga del archivo utilizando el atributo 'download'
     link.setAttribute('download', `${taskId}_informe.pdf`);
   
