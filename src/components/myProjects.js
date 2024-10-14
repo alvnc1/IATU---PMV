@@ -22,6 +22,8 @@ function MyProjects() {
   const [selectedProject, setSelectedProject] = useState(null);
   const [usersWithAccess, setUsersWithAccess] = useState([]);
   const [usersWithoutAccess, setUsersWithoutAccess] = useState([]);
+  const [hoveredUser, setHoveredUser] = useState(null);
+
   const navigate = useNavigate();
   const auth = getAuth();
 
@@ -81,21 +83,28 @@ function MyProjects() {
   };
 
   const handleShareProject = (project) => {
-    setSelectedProject(project);
+  setSelectedProject(project);
+
+  // Incluir el propietario del proyecto en la lista de usuarios con acceso
+  const owner = users.find(user => user.id === project.userId);
+  const withAccess = users.filter(user => project.sharedWith?.includes(user.id));
+
+  // Asegurarse de que el propietario esté en la lista
+  if (owner && !withAccess.some(user => user.id === owner.id)) {
+    withAccess.unshift(owner);
+  }
+
+  // Filtrar los usuarios sin acceso (excluyendo al propietario del proyecto y a los que ya están en 'sharedWith')
+  const withoutAccess = users.filter(
+    user => !project.sharedWith?.includes(user.id) && user.id !== project.userId
+  );
+
+  setUsersWithAccess(withAccess);
+  setUsersWithoutAccess(withoutAccess);
+
+  setShowShareModal(true);
+};
   
-    // Filtrar los usuarios con acceso (los que están en 'sharedWith')
-    const withAccess = users.filter(user => project.sharedWith?.includes(user.id));
-  
-    // Filtrar los usuarios sin acceso (excluyendo al propietario del proyecto y a los que ya están en 'sharedWith')
-    const withoutAccess = users.filter(
-      user => !project.sharedWith?.includes(user.id) && user.id !== project.userId
-    );
-  
-    setUsersWithAccess(withAccess);
-    setUsersWithoutAccess(withoutAccess);
-  
-    setShowShareModal(true);
-  };
   
 
   const shareProjectWithUser = async (userId) => {
@@ -109,11 +118,11 @@ function MyProjects() {
       });
 
       console.log(`Proyecto ${selectedProject.nombreProyecto} compartido con el usuario ID: ${userId}`);
-      alert(`Proyecto compartido exitosamente con el usuario`);
 
-      // Actualiza la lista de usuarios con acceso y sin acceso después de compartir
-      setUsersWithAccess([...usersWithAccess, usersWithoutAccess.find(user => user.id === userId)]);
-      setUsersWithoutAccess(usersWithoutAccess.filter(user => user.id !== userId));
+      const user = auth.currentUser;
+      if (user) {
+        await getProjects(user.uid);
+      }
 
       setShowShareModal(false);
     } catch (error) {
@@ -121,6 +130,38 @@ function MyProjects() {
       alert('Hubo un error al compartir el proyecto');
     }
   };
+
+  const revokeAccess = async (userId) => {
+    try {
+      if (!selectedProject) return;
+  
+      const projectRef = doc(db, 'proyectos', selectedProject.id);
+  
+      // Actualizar el documento para eliminar el usuario de 'sharedWith'
+      await updateDoc(projectRef, {
+        sharedWith: selectedProject.sharedWith.filter(id => id !== userId)
+      });
+  
+      console.log(`Acceso revocado al usuario ID: ${userId} para el proyecto ${selectedProject.nombreProyecto}`);
+  
+      // Actualizar la lista de usuarios con acceso y sin acceso en el estado local
+      setUsersWithAccess(usersWithAccess.filter(user => user.id !== userId));
+      const userRevoked = usersWithAccess.find(user => user.id === userId);
+      if (userRevoked) {
+        setUsersWithoutAccess([...usersWithoutAccess, userRevoked]);
+      }
+  
+      // Recargar la lista de proyectos para reflejar el cambio
+      const user = auth.currentUser;
+      if (user) {
+        await getProjects(user.uid);
+      }
+    } catch (error) {
+      console.error('Error al revocar acceso: ', error);
+      alert('Hubo un error al revocar el acceso');
+    }
+  };
+  
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -213,7 +254,15 @@ function MyProjects() {
                     <MdAccountCircle size={20} style={{ marginRight: '8px', color: '#555' }} />
                     <span className="user-email">{user.email}</span>
                   </div>
-                  <Button className="status-btn access">Ya tiene acceso</Button>
+                  <Button
+                    className={`status-btn access ${hoveredUser === user.id ? "share" : ""}`}
+                    onMouseEnter={() => setHoveredUser(user.id)}
+                    onMouseLeave={() => setHoveredUser(null)}
+                    onClick={() => revokeAccess(user.id)}
+                  >
+                    {hoveredUser === user.id ? "Quitar acceso" : "Ya tiene acceso"}
+                  </Button>
+
                 </div>
               ))
             ) : (
@@ -248,9 +297,6 @@ function MyProjects() {
           </Button>
         </Modal.Footer>
       </Modal>
-
-
-
     </div>
   );
 }

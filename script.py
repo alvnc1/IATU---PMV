@@ -1,5 +1,9 @@
 import cv2
 import os
+from firebase_admin import credentials, initialize_app, storage, firestore
+from io import BytesIO
+from fpdf import FPDF
+from firebase_admin import credentials, storage
 import sys
 import shutil
 from flask import jsonify
@@ -53,6 +57,8 @@ if not os.path.exists(output_folder):
 video_path = sys.argv[1]
 url = sys.argv[2]
 categorias = sys.argv[3].split(',')
+id = sys.argv[4]
+idP = sys.argv[5]
 
 print(video_path)
 print(url)
@@ -177,7 +183,7 @@ for idx, image_filename in enumerate(os.listdir(input_dir)):
 pdf.add_page()
 # Configurar Selenium con Chrome
 chrome_options = Options()
-chrome_options.add_argument("--headless")
+chrome_options.add_argument("--headless=old")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
@@ -2506,6 +2512,43 @@ for categoria in categorias:
         hdu_nueve(url)
 
 driver.quit()
-pdf.output(f"public/informe.pdf")
+
+
+# Inicializa Firebase
+cred = credentials.Certificate('src\components\config\iatu-pmv-firebase-adminsdk-my9kl-8e5b47f816.json')
+initialize_app(cred, {'storageBucket': 'iatu-pmv.appspot.com'})
+
+# Usar BytesIO para guardar el PDF en memoria
+pdf_stream = BytesIO()
+# Guardar el contenido del PDF en el flujo de bytes usando el parámetro dest='S'
+pdf_output = pdf.output(dest='S').encode('latin1')  # En FPDF, el formato de salida es string, lo convertimos a bytes
+pdf_stream.write(pdf_output)
+pdf_stream.seek(0)  # Mover el cursor al inicio del archivo en memoria
+
+
+# Subir el PDF a Firebase Storage sin guardarlo localmente
+bucket = storage.bucket()
+blob = bucket.blob(f'pdfs/{id}/informe.pdf')
+# Subir directamente el contenido del PDF en bytes
+blob.upload_from_string(pdf_stream.getvalue(), content_type='application/pdf')
+
+# Hacer que el archivo sea público y obtener su URL
+blob.make_public()
+pdf_url = blob.public_url
+print(f"PDF disponible en: {pdf_url}")
+
+# Guarda la URL del PDF en Firestore bajo el documento correspondiente en tasks
+db = firestore.client()
+task_ref = db.collection('proyectos').document(idP).collection('tasks').document(id)
+
+# Actualiza el campo 'pdfUrl' con la URL pública del PDF
+task_ref.update({
+    'pdfUrl': pdf_url
+})
+
+print(f"URL del PDF guardada en Firestore: {pdf_url}")
+
+# Generar y guardar el PDF
+#pdf.output(f"public/informe.pdf")
 shutil.rmtree('capturas')
 shutil.rmtree('output_evaluated_images')

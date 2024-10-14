@@ -5,7 +5,7 @@ import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
 import { MdDelete, MdPlayArrow, MdAdd, MdVideoLibrary } from "react-icons/md";
-import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from "./firebase";
 import { useNavigate } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
@@ -82,46 +82,42 @@ function ProjectPage() {
     navigate(`/newTask/${id}`);
   };
 
-  const handlePlayTask = (taskId) => {
+  const handlePlayTask = (task) => {
     setIsLoading(true);
-
-    const videoUrl = taskId.files.find(file => file.url).url;
-    const urlTarea = taskId.urlTarea;
-    const categorias = taskId.categorias;
+  
+    const videoUrl = task.files.find(file => file.url).url;
+    const urlTarea = task.urlTarea;
+    const categorias = task.categorias;
+    const idT = task.id;
+    const idP = id;
     console.log(videoUrl);
     console.log(urlTarea);
     console.log(categorias);
-
+    console.log(task.id);
+  
     if (!videoUrl || !urlTarea || !categorias) {
       setIsLoading(false);
       return alert('Faltan datos para ejecutar el análisis');
     }
-
+  
     setTestStatus(prevStatus => ({
       ...prevStatus,
-      [taskId.id]: 'Ejecutando'
+      [task.id]: 'Ejecutando'
     }));
-
+  
     fetch('http://localhost:3001/run-python', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ videoUrl, urlTarea, categorias })
+      body: JSON.stringify({ videoUrl, urlTarea, categorias, idT, idP })
     })
     .then(response => response.json())
-    .then(data => {
-      console.log('Respuesta del servidor:', data);
-      setTestStatus(prevStatus => ({
-        ...prevStatus,
-        [taskId.id]: 'Finalizado'
-      }));
-    })
     .catch(error => {
       console.error('Error al ejecutar el script de Python:', error);
       setTestStatus(prevStatus => ({
         ...prevStatus,
-        [taskId.id]: 'Error'
+        [task.id]: 'Error'
       }));
     })
     .finally(() => {
@@ -129,15 +125,25 @@ function ProjectPage() {
     });
   };
 
-  // Función para descargar el PDF
-  const handleDownload = () => {
+  // Función para manejar la descarga del PDF
+  const handleDownloadPDF = (pdfUrl, taskId) => {
+    if (!pdfUrl) return;
+  
+    // Crear un enlace temporal para forzar la descarga
     const link = document.createElement('a');
-    link.href = process.env.PUBLIC_URL + '/informe.pdf';  // Ruta al PDF en el directorio 'public'
-    link.setAttribute('download', 'informe.pdf');  // Nombre con el que se descargará
+    link.href = pdfUrl;
+  
+    // Forzar la descarga del archivo utilizando el atributo 'download'
+    link.setAttribute('download', `${taskId}_informe.pdf`);
+  
+    // Añadir el enlace al DOM y simular el clic para iniciar la descarga
     document.body.appendChild(link);
     link.click();
+  
+    // Eliminar el enlace después de que se haya descargado el archivo
     document.body.removeChild(link);
   };
+  
 
   // Maneja la reproducción del video
   const handleShowVideoModal = (task) => {
@@ -190,7 +196,12 @@ function ProjectPage() {
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
                   <td>{testStatus[task.id]}</td>
                   <td>
-                    <Button variant="outline-primary" onClick={handleDownload} className="me-2 pdf-button">
+                    <Button
+                      variant="outline-primary"
+                      onClick={() => handleDownloadPDF(task.pdfUrl)}
+                      className="me-2 pdf-button"
+                      disabled={!task.pdfUrl}  // Deshabilitar el botón si no hay pdfUrl
+                    >
                       PDF
                     </Button>
                   </td>
