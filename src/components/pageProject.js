@@ -41,6 +41,7 @@ function ProjectPage() {
     const tasksCollection = collection(db, 'proyectos', id, 'tasks');
     const snapshot = await getDocs(tasksCollection);
     const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  
     tasksList.sort((a, b) => {
       if (sortOrder === 'asc') {
         return new Date(a.fechaCreacion) - new Date(b.fechaCreacion);
@@ -48,14 +49,17 @@ function ProjectPage() {
         return new Date(b.fechaCreacion) - new Date(a.fechaCreacion);
       }
     });
-    setTasks(tasksList);
-
-    const initialStatus = {};
+  
+    // Aquí actualizamos el estado según si el pdfUrl existe o no
+    const updatedStatus = {};
     tasksList.forEach(task => {
-      initialStatus[task.id] = testStatus[task.id] || 'Pendiente';
+      updatedStatus[task.id] = task.pdfUrl ? 'Finalizado' : (testStatus[task.id] || 'Pendiente');
     });
-    setTestStatus(initialStatus);
+  
+    setTasks(tasksList);
+    setTestStatus(updatedStatus); // Actualizamos el estado de las tareas
   };
+  
 
   const deleteTask = async (taskId) => {
     try {
@@ -197,11 +201,11 @@ function ProjectPage() {
                 <tr key={task.id}>
                   <td className="text-truncate">{task.nombreTarea}</td>
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
-                  <td>{testStatus[task.id]}</td>
+                  <td>{testStatus[task.id]}</td> {/* Mostrar el estado actualizado */}
                   <td>
                     <Button
                       variant="outline-primary"
-                      onClick={() => handleDownloadPDF(task.pdfUrl)}
+                      onClick={() => handleDownloadPDF(task.pdfUrl, task.id)}
                       className="me-2 pdf-button"
                       disabled={!task.pdfUrl}  // Deshabilitar el botón si no hay pdfUrl
                     >

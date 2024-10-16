@@ -29,7 +29,7 @@ function NewTask() {
         "Calidad del Contenido",
         "Diagramación y Diseño",
         "Sección de Búsquedas",
-        "Sección de Reconocimiento de Errores y Retroalimentación"
+        "Retroalimentacion de Acciones"
     ];
 
     const handleNombreTareaChange = (e) => {
