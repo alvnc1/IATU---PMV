@@ -1,0 +1,199 @@
+.project-card .card-headline {
+  font-size: 24px; /* Headline */
+  margin-bottom: 0.5rem;
+}
+
+.project-card .card-subhead {
+  font-size: 16px; /* Subheadline */
+}
+
+.project-card .card-body p {
+  font-size: 14px; /* Body */
+}
+
+.project-card .card-body .d-flex {
+  gap: 60px; /* Espacio entre los botones */
+}
+
+.feed-btn {
+  font-size: 16px; /* Button Label */
+  background-color: #007bff;
+  border: none;
+  color: #ffffff;
+  border-radius: 30px; /* Más redondeado */
+}
+
+.feed-btn:hover {
+  background-color:  #0056b3;
+  color: #ffffff;
+}
+
+.danger-btn {
+  font-size: 16px; /* Button Label */
+  background-color: #dc3545; /* Color rojo de Bootstrap */
+  color: white;
+  border: none;
+  border-radius: 30px; /* Más redondeado */
+}
+
+.danger-btn:hover {
+  background-color: #c82333;
+  color: white;
+}
+
+.neutral-btn {
+  background-color: #17884a;
+  border: none;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  border-radius: 30px; /* Más redondeado */
+}
+
+.neutral-btn:hover {
+  background-color: #17884a;
+  color: #111;
+}
+
+
+.project-tile:hover {
+  background-color: #f0f0f0; /* Cambio de color al pasar el cursor */
+}
+
+.project-tile:active {
+  background-color: #dcdcdc; /* Cambio de color al hacer clic */
+}
+
+
+.project-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 15px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.project-tile:hover {
+  background-color: #f0f0f0; /* Cambio de color al pasar el cursor */
+}
+
+.project-tile:active {
+  background-color: #dcdcdc; /* Cambio de color al hacer clic */
+}
+
+.project-tile h5 {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.project-tile .text-muted {
+  font-size: 14px;
+}
+
+.project-tile .btn {
+  margin-right: 10px;
+  width: 48%;
+}
+
+.project-tile .dropdown-toggle::after {
+  display: none;
+}
+
+
+.project-header {
+  margin-left: left;
+  margin-top: 16px;
+}
+
+/* Estilos para la pantalla de carga */
+#loader {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #f7f9fb;
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transition: opacity 0.5s ease;
+  overflow: hidden; /* Evita cualquier tipo de desplazamiento */
+}
+
+.spinner {
+  border: 8px solid #f3f3f3;
+  border-top: 8px solid #333;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+
+/* Estilos personalizados para el hover del Dropdown */
+.dropdown-menu .dropdown-item:hover,
+.dropdown-menu .dropdown-item:focus {
+  background-color: #e0e0e0; /* Cambia el color a gris */
+  color: #333; /* Cambia el color del texto si es necesario */
+}
+
+
+/* Estilos para el modal de compartir proyectos */
+.share-modal .modal-body h5 {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 1rem;
+}
+
+.share-modal .user-list {
+  margin-bottom: 1.5rem;
+}
+
+.share-modal .user-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.share-modal .user-item .user-email {
+  font-size: 14px;
+  color: #333;
+  margin-right: 150px;
+  flex-grow: 1;
+}
+
+.share-modal .user-item .status-btn {
+  padding: 0.2rem 0.8rem;
+  border-radius: 20px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.share-modal .user-item .status-btn.access {
+  background-color: #17884a;
+  color: white;
+  border: none;
+}
+
+.share-modal .user-item .status-btn.share {
+  background-color: #333;
+  color: white;
+  border: none;
+}
+
+.share-modal .user-item .status-btn:hover {
+  opacity: 0.9;
+}
