@@ -5,11 +5,11 @@ import Sidebar from "./sidebar";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Dropdown from 'react-bootstrap/Dropdown';
-import DropdownButton from 'react-bootstrap/DropdownButton';
 import { MdSave } from "react-icons/md";
 import { db, storage } from "./firebase"; 
 import { doc, setDoc, collection } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import './css/tasks.css';
 
 function NewTask() {
     const { id: projectId } = useParams(); 
@@ -20,17 +20,28 @@ function NewTask() {
     const [uploadStatus, setUploadStatus] = useState({});
     const navigate = useNavigate();
 
-    const categorias = [
-        "Página de Inicio",
-        "Orientación de Tareas",
-        "Navegabilidad",
-        "Formularios",
-        "Confianza y Credibilidad",
-        "Calidad del Contenido",
-        "Diagramación y Diseño",
-        "Sección de Búsquedas",
-        "Sección de Reconocimiento de Errores y Retroalimentación"
-    ];
+    const categorias = {
+        Usabilidad: [
+            "Página de Inicio",
+            "Orientación de Tareas",
+            "Navegabilidad",
+            "Formularios",
+            "Confianza y Credibilidad",
+            "Calidad del Contenido",
+            "Diagramación y Diseño",
+            "Sección de Búsquedas",
+            "Sección de Reconocimiento de Errores y Retroalimentación"
+        ],
+        "Adultos Mayores": [
+            "Retroalimentacion de Acciones",
+            "Facilidad de Navegacion",
+            "Legibilidad del Texto",
+            "Interaccion con Elementos Clickables",
+            "Cognitiva y Organizacion Visual",
+            "Ayuda Contextual"
+        ],
+        Accesibilidad: []  // De momento vacío
+    };
 
     const handleNombreTareaChange = (e) => {
         setNombreTarea(e.target.value);
@@ -49,6 +60,39 @@ function NewTask() {
             }
         });
     };
+
+    const renderSubMenu = (title, items) => (
+        <Dropdown drop="right" className="submenu">
+            <Dropdown.Toggle as="div" className="submenu-item">{title}</Dropdown.Toggle>
+            <Dropdown.Menu>
+                {items.map((item) => (
+                    <Dropdown.Item key={item}>
+                        <Form.Check
+                            type="checkbox"
+                            label={item}
+                            checked={selectedCategorias.includes(item)}
+                            onChange={() => handleCategoriaChange(item)}
+                        />
+                    </Dropdown.Item>
+                ))}
+            </Dropdown.Menu>
+        </Dropdown>
+    );
+
+    const renderCategoriasMenu = () => (
+        <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" id="dropdown-basic">
+                Selecciona las categorías
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+                {Object.entries(categorias).map(([key, values]) => (
+                    values.length > 0 ? renderSubMenu(key, values) : (
+                        <Dropdown.ItemText key={key}>{key}</Dropdown.ItemText>
+                    )
+                ))}
+            </Dropdown.Menu>
+        </Dropdown>
+    );
 
     const handleFileUpload = async (file) => {
         const fileId = Date.now().toString();
@@ -83,7 +127,6 @@ function NewTask() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            // Crear y guardar la tarea dentro del proyecto especificado
             if (nombreTarea || urlTarea || files.length > 0) {
                 const taskId = Date.now().toString();
                 const tareaRef = doc(collection(db, `proyectos/${projectId}/tasks`), taskId);
@@ -96,13 +139,10 @@ function NewTask() {
                 };
                 await setDoc(tareaRef, tareaData);
             }
-
-            // Limpiar los estados después de guardar
             setNombreTarea('');
             setUrlTarea('');
             setSelectedCategorias([]);
             setFiles([]);
-
             alert("Tarea guardada correctamente!");
             navigate(`/project/${projectId}`);
         } catch (error) {
@@ -114,117 +154,105 @@ function NewTask() {
     return (
         <div style={{ display: 'flex' }}>
             <Sidebar />
-
             <div style={{ marginLeft: '250px', width: '100%' }}>
-            <Container
-                style={{
-                    marginTop: "20px",
-                    backgroundColor: "white",
-                    borderRadius: "10px",
-                    padding: "20px",
-                    width: "90%", 
-                    maxWidth: "1200px", 
-                    height: "80vh", 
-                    overflowY: "auto", 
-                    boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)", 
-                }}
-            >
-                <div className="d-flex justify-content-between align-items-center">
-                    <h2 style={{ textAlign: "left", margin: 0 }}>Nueva Tarea</h2>
-                    <div>
-                        <Button variant="primary" onClick={handleSubmit}>
-                            <MdSave size={18} style={{ marginRight: '5px'}} />
-                            Guardar
-                        </Button>
-                    </div>
-                </div>
-                <hr style={{ color: '#000000', backgroundColor: '#000000', height: 2 }} />
-
-                <Form onSubmit={handleSubmit}>
-                    <Form.Group controlId="formBasicNombreTarea">
-                        <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Nombre de la Tarea</Form.Label>
-                        <Form.Control
-                            type="text"
-                            placeholder="Escribe el nombre de la tarea..."
-                            value={nombreTarea}
-                            onChange={handleNombreTareaChange}
-                        />
-                    </Form.Group>
-
-                    <Form.Group controlId="formBasicCategoriaTareas">
-                        <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Categoría de la Tarea</Form.Label>
-                        <DropdownButton id="dropdown-basic-button" title="Selecciona las categorías" variant="outline-secondary">
-                            {categorias.map((categoria) => (
-                                <Dropdown.Item key={categoria} as="button">
-                                    <Form.Check
-                                        type="checkbox"
-                                        label={categoria}
-                                        checked={selectedCategorias.includes(categoria)}
-                                        onChange={() => handleCategoriaChange(categoria)}
-                                    />
-                                </Dropdown.Item>
-                            ))}
-                        </DropdownButton>
-                    </Form.Group>
-
-                    <Form.Group controlId="formBasicUrlTarea">
-                        <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>URL de la Tarea</Form.Label>
-                        <Form.Control
-                            type="url"
-                            placeholder="Ingresa la URL relacionada con la tarea..."
-                            value={urlTarea}
-                            onChange={handleUrlTareaChange}
-                        />
-                    </Form.Group>
-
-                    <Form.Group controlId="formBasicFiles">
-                        <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Subir Archivos de la Tarea</Form.Label>
-                        <div
-                            style={{
-                                border: '2px dashed #ccc',
-                                borderRadius: '10px',
-                                padding: '20px',
-                                textAlign: 'center',
-                                marginBottom: '20px',
-                                height: '180px',
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center'
-                            }}
-                            onDrop={(e) => {
-                                e.preventDefault();
-                                handleFilesChange(e);
-                            }}
-                            onDragOver={(e) => e.preventDefault()}
-                        >
-                            <input
-                                type="file"
-                                multiple
-                                onChange={handleFilesChange}
-                                style={{ display: 'none' }}
-                                id="fileUpload"
-                            />
-                            <label htmlFor="fileUpload" style={{ cursor: 'pointer' }}>
-                                Arrastra y suelta tus archivos aquí o <span style={{ color: '#007bff', textDecoration: 'underline' }}>explora</span> para subir.
-                            </label>
+                <Container
+                    style={{
+                        marginTop: "20px",
+                        backgroundColor: "white",
+                        borderRadius: "10px",
+                        padding: "20px",
+                        width: "90%", 
+                        maxWidth: "1200px", 
+                        height: "80vh", 
+                        overflowY: "auto", 
+                        boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)", 
+                    }}
+                >
+                    <div className="d-flex justify-content-between align-items-center">
+                        <h2 style={{ textAlign: "left", margin: 0 }}>Nueva Tarea</h2>
+                        <div>
+                            <Button variant="primary" onClick={handleSubmit}>
+                                <MdSave size={18} style={{ marginRight: '5px'}} />
+                                Guardar
+                            </Button>
                         </div>
-                    </Form.Group>
+                    </div>
+                    <hr style={{ color: '#000000', backgroundColor: '#000000', height: 2 }} />
 
-                    <Form.Group controlId="formBasicUploadedFiles">
-                        <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Archivos Subidos</Form.Label>
-                        {files.map((file) => (
-                            <div key={file.id} style={{ marginBottom: '10px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span>{file.name}</span>
-                                    {uploadStatus[file.id] === 'uploading' && <span>Cargando...</span>}
-                                    {uploadStatus[file.id] === 'success' && <span style={{ color: 'green' }}>Subido</span>}
-                                    {uploadStatus[file.id] === 'error' && <span style={{ color: 'red' }}>Error al subir</span>}
-                                </div>
+                    <Form onSubmit={handleSubmit}>
+                        <Form.Group controlId="formBasicNombreTarea">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Nombre de la Tarea</Form.Label>
+                            <Form.Control
+                                type="text"
+                                placeholder="Escribe el nombre de la tarea..."
+                                value={nombreTarea}
+                                onChange={handleNombreTareaChange}
+                            />
+                        </Form.Group>
+
+                        <Form.Group controlId="formBasicCategoriaTareas">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Categoría de la Tarea</Form.Label>
+                            {renderCategoriasMenu()}
+                        </Form.Group>
+
+                        <Form.Group controlId="formBasicUrlTarea">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>URL de la Tarea</Form.Label>
+                            <Form.Control
+                                type="url"
+                                placeholder="Ingresa la URL relacionada con la tarea..."
+                                value={urlTarea}
+                                onChange={handleUrlTareaChange}
+                            />
+                        </Form.Group>
+
+                        <Form.Group controlId="formBasicFiles">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Subir Archivos de la Tarea</Form.Label>
+                            <div
+                                style={{
+                                    border: '2px dashed #ccc',
+                                    borderRadius: '10px',
+                                    padding: '20px',
+                                    textAlign: 'center',
+                                    marginBottom: '20px',
+                                    height: '180px',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center'
+                                }}
+                                onDrop={(e) => {
+                                    e.preventDefault();
+                                    handleFilesChange(e);
+                                }}
+                                onDragOver={(e) => e.preventDefault()}
+                            >
+                                <input
+                                    type="file"
+                                    multiple
+                                    onChange={handleFilesChange}
+                                    style={{ display: 'none' }}
+                                    id="fileUpload"
+                                />
+                                <label htmlFor="fileUpload" style={{ cursor: 'pointer' }}>
+                                    Arrastra y suelta tus archivos aquí o <span style={{ color: '#007bff', textDecoration: 'underline' }}>explora</span> para subir.
+                                </label>
                             </div>
-                        ))}
-                    </Form.Group>
-                </Form>
-            </Container>
+                        </Form.Group>
+
+                        <Form.Group controlId="formBasicUploadedFiles">
+                            <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Archivos Subidos</Form.Label>
+                            {files.map((file) => (
+                                <div key={file.id} style={{ marginBottom: '10px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span>{file.name}</span>
+                                        {uploadStatus[file.id] === 'uploading' && <span>Cargando...</span>}
+                                        {uploadStatus[file.id] === 'success' && <span style={{ color: 'green' }}>Subido</span>}
+                                        {uploadStatus[file.id] === 'error' && <span style={{ color: 'red' }}>Error al subir</span>}
+                                    </div>
+                                </div>
+                            ))}
+                        </Form.Group>
+                    </Form>
+                </Container>
             </div>
         </div>
     );

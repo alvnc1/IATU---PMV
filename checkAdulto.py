@@ -1,10 +1,10 @@
 import os
+import shutil
 import time
 import re
 import threading
-from firebase_admin import credentials, initialize_app, storage, firestore
 import sys
-import shutil
+from firebase_admin import credentials, initialize_app, storage, firestore
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -33,10 +33,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from selenium.webdriver.support.ui import WebDriverWait
 from io import BytesIO
-
-output_folder = "output_images"
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
 
 # Obtener la ruta del video desde los argumentos de la línea de comandos
 video_path = sys.argv[1]
@@ -95,7 +91,7 @@ cap.release()
 
 CLIENT = InferenceHTTPClient(
     api_url="https://detect.roboflow.com/",
-    api_key="FCbLovxwSDWFYTwaMuQi"
+    api_key="bUyMUjRY0TGSKrbNpksy"
 )
 
 def draw_bounding_boxes(frame, predictions):
@@ -321,41 +317,41 @@ def appIconDetect(image_dir, output_dir, model_id):
 
     print("Proceso de detección y guardado de bounding boxes por clase completado.")
 
-##Parámetros del modelo y la clase a detectar
-#model_id = "app-icon/45"  # Reemplaza con el ID de tu modelo de Roboflow
-#
-##Directorios de entrada y salida
-#video_path = "capturas"  # Reemplaza con la ruta de tu video
-#output_dir = "output_icon"
-#image_dir = "capturas"
-#os.makedirs(output_dir, exist_ok=True)
-#appIconDetect(image_dir, output_dir, model_id)
-#model_id = "progressbar-iptbc/6"  # Reemplaza con el ID de tu modelo de Roboflow
-#class_of_interest = "ProgressBar"  # Clase que deseas detectar
-#
-#output_dir = "output_pb"
-#os.makedirs(output_dir, exist_ok=True)
-#progressBar_flag = progressBarDetect(image_dir, output_dir, model_id, class_of_interest)
-#
-#
-#model_id = "cingoz8/1"  # Reemplaza con el ID de tu modelo de Roboflow
-#excluded_class = "icon"  # Clase que deseas detectar
-#
-#
-#output_dir = "output_cingoz"
-#os.makedirs(output_dir, exist_ok=True)
-#cingozDetect(image_dir, output_dir, model_id, excluded_class)
-#
-#
-#model_id = "app-icon/45"  # Reemplaza con el ID de tu modelo de Roboflow
-#
-#
-#video_path = "capturas"  # Reemplaza con la ruta de tu video
-#output_dir = "output_icon"
-#os.makedirs(output_dir, exist_ok=True)
-#appIconDetect(image_dir, output_dir, model_id) 
-#
-#
+#Parámetros del modelo y la clase a detectar
+model_id = "app-icon/45"  # Reemplaza con el ID de tu modelo de Roboflow
+
+#Directorios de entrada y salida
+video_path = "capturas"  # Reemplaza con la ruta de tu video
+output_dir = "output_icon"
+image_dir = "capturas"
+os.makedirs(output_dir, exist_ok=True)
+appIconDetect(image_dir, output_dir, model_id)
+model_id = "progressbar-iptbc/6"  # Reemplaza con el ID de tu modelo de Roboflow
+class_of_interest = "ProgressBar"  # Clase que deseas detectar
+
+output_dir = "output_pb"
+os.makedirs(output_dir, exist_ok=True)
+progressBar_flag = progressBarDetect(image_dir, output_dir, model_id, class_of_interest)
+
+
+model_id = "cingoz8/1"  # Reemplaza con el ID de tu modelo de Roboflow
+excluded_class = "icon"  # Clase que deseas detectar
+
+
+output_dir = "output_cingoz"
+os.makedirs(output_dir, exist_ok=True)
+cingozDetect(image_dir, output_dir, model_id, excluded_class)
+
+
+model_id = "app-icon/45"  # Reemplaza con el ID de tu modelo de Roboflow
+
+
+video_path = "capturas"  # Reemplaza con la ruta de tu video
+output_dir = "output_icon"
+os.makedirs(output_dir, exist_ok=True)
+appIconDetect(image_dir, output_dir, model_id) 
+
+
 def obtener_nombre_elemento(element, idx):
     """Devuelve un nombre representativo del elemento para usar en logs y archivos."""
     if element.get_attribute('id'):
@@ -604,11 +600,11 @@ pdf.set_font("Arial", size=14)
 def hdu_dos_dos(url):
     pdf.ln(10)
     pdf.set_font("Arial", "B", size=14)
-    pdf.cell(200, 10, txt="Criterios de Adulto Mayor", ln=True, align='C')
+    pdf.cell(200, 10, txt="Criterio: Retroalimentación de Acciones", ln=True, align='C')
 
     # Agrega un título
     pdf.set_font("Arial", "I", size=10)
-    pdf.cell(200, 10, txt="Facilidad de Navegación:", ln=True, align='L')
+    pdf.cell(200, 10, txt="Mensajes de Confirmación:", ln=True, align='L')
 
     # Configurar el driver de Selenium en modo headless
     chrome_options = Options()
@@ -643,6 +639,8 @@ def hdu_dos_dos(url):
     except Exception as e:
         print(f"Error al verificar mensajes de confirmación: {e}")
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Indicadores de progreso:", ln=True, align='L')
     # --- Criterio 2: Verificar indicadores de proceso ---
     try:
         indicadores_proceso = driver.find_elements(By.CSS_SELECTOR, '.loading, .spinner, .progress, .loader')
@@ -659,6 +657,9 @@ def hdu_dos_dos(url):
             pdf.multi_cell(0, 6, f"- No se encontraron indicadores de proceso en la página.")
     except Exception as e:
         print(f"Error al verificar indicadores de proceso: {e}")
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Retorno Visual:", ln=True, align='L')
 
     # --- Criterio 3: Verificar retorno visual inmediato ---
     try:
@@ -716,47 +717,81 @@ def hdu_dos_tres(url):
     chrome_options.add_argument("--window-position=-2400,-2400")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", size=14)
+    pdf.cell(200, 10, txt="Criterio: Facilidad de Navegación", ln=True, align='C')
+
     # Crear directorio para capturas de pantalla
     screenshots_dir = "capturas_navegacion"
     os.makedirs(screenshots_dir, exist_ok=True)
 
     # Navegar a la URL
     driver.get(url)
-
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Menús de Navegación:", ln=True, align='L')
     # --- Criterio 1: Verificar menús de navegación claros ---
     try:
         menus = driver.find_elements(By.CSS_SELECTOR, 'nav, .menu, .navbar')
         if menus:
             for idx, menu in enumerate(menus, start=1):
+                pdf.set_font("Arial", size=8)  # Establecemos la fuente
+                pdf.set_x(15)  # Ajuste de sangría
                 pdf.multi_cell(0, 6, f"- Menú de navegación encontrado. Capturando menú {idx}.")
-                menu.screenshot(os.path.join(screenshots_dir, f"menu_navegacion_{idx}.png"))
+                
+                # Guardar la captura de pantalla
+                screenshot_path = os.path.join(screenshots_dir, f"menu_navegacion_{idx}.png")
+                menu.screenshot(screenshot_path)
                 print(f"Captura guardada: menu_navegacion_{idx}.png")
+                
+                # Añadir la imagen justo debajo del texto
+                current_y = pdf.get_y()  # Obtener la posición vertical actual
+                pdf.image(screenshot_path, x=15, y=current_y + 2, w=90)  # Ajustar 'w' según el ancho necesario
+                
+                # Mover la posición vertical del cursor debajo de la imagen para continuar el texto de manera ordenada
+                pdf.set_y(current_y + 20)  # Ajusta este valor según el tamaño de la imagen para evitar solapamientos
+
         else:
-            pdf.multi_cell(0, 6, f"- No se encontraron menús de navegación claros.")
+            pdf.set_font("Arial", size=8)  # Establecemos la fuente
+            pdf.set_x(15)  # Ajuste de sangría
+            pdf.multi_cell(0, 6, "- No se encontraron menús de navegación claros.")
+
     except Exception as e:
         print(f"Error al verificar menús de navegación: {e}")
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Scroll Vertical:", ln=True, align='L')
     # --- Criterio 2: Verificar scroll vertical no excesivo y secciones claras ---
     try:
         body_height = driver.execute_script("return document.body.scrollHeight")
         window_height = driver.execute_script("return window.innerHeight")
         if body_height > window_height * 3:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- Advertencia: El scroll vertical es excesivo. Altura del documento: {body_height}px")
         else:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- Scroll vertical dentro del rango aceptable. Altura del documento: {body_height}px")
-
+        
+        pdf.set_font("Arial", "I", size=10)
+        pdf.cell(200, 10, txt="Secciones Claramente Separadas:", ln=True, align='L')
         # Verificar que las secciones estén claramente separadas
         secciones = driver.find_elements(By.CSS_SELECTOR, 'section, .content, .main-section')
         if secciones:
-            print(f"Se encontraron {len(secciones)} secciones claramente separadas.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 6, f"- Se encontraron {len(secciones)} secciones claramente separadas.")
             for idx, section in enumerate(secciones, start=1):
                 section.screenshot(os.path.join(screenshots_dir, f"seccion_{idx}.png"))
                 print(f"Captura guardada: seccion_{idx}.png")
         else:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- No se encontraron secciones claramente separadas.")
     except Exception as e:
         pass
-
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Enlaces identificables:", ln=True, align='L')
     # --- Criterio 3: Verificar enlaces identificables ---
     try:
         enlaces = driver.find_elements(By.CSS_SELECTOR, 'a')
@@ -767,48 +802,73 @@ def hdu_dos_tres(url):
             if enlace.value_of_css_property('text-decoration').find('underline') != -1 or enlace.value_of_css_property('color') != 'initial':
                 enlaces_identificables += 1
 
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
         pdf.multi_cell(0, 6, f"- {enlaces_identificables} de los {total_enlaces} enlaces son fácilmente identificables.")
         if enlaces_identificables < total_enlaces:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- Advertencia: {total_enlaces - enlaces_identificables} enlaces no son fácilmente identificables.")
     except Exception as e:
         print(f"Error al verificar enlaces identificables: {e}")
 
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Mapa del sitio accesible:", ln=True, align='L')
     # --- Criterio 4: Verificar mapa del sitio accesible ---
     try:
         mapa_sitio = driver.find_element(By.LINK_TEXT, 'Mapa del sitio')
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
         pdf.multi_cell(0, 6, f"- Mapa del sitio accesible desde la página.")
         mapa_sitio.screenshot(os.path.join(screenshots_dir, "mapa_sitio.png"))
         print("Captura guardada: mapa_sitio.png")
     except NoSuchElementException:
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
         pdf.multi_cell(0, 6, f"- No se encontró el enlace al mapa del sitio.")
     except Exception as e:
         pass
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Menús Complejos:", ln=True, align='L')
     # --- Criterio 5: Evitar menús desplegables complejos ---
     try:
         menues_desplegables = driver.find_elements(By.CSS_SELECTOR, 'ul ul, .dropdown-menu, .submenu')
         if menues_desplegables:
-            pdf.multi_cell(0, 6, f"- Advertencia: Se encontraron {len(menues_desplegables)} menús desplegables complejos.")
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+            pdf.multi_cell(0, 6, f"- Advertencia: Se encontraron {len(menues_desplegables)} menú/s desplegables complejos.")
             for idx, menu in enumerate(menues_desplegables, start=1):
                 menu.screenshot(os.path.join(screenshots_dir, f"menu_desplegable_{idx}.png"))
                 print(f"Captura guardada: menu_desplegable_{idx}.png")
         else:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- No se encontraron menús desplegables complejos.")
     except Exception as e:
         pass
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Navegación Consistente:", ln=True, align='L')
     # --- Criterio 6: Verificar consistencia de estructura de navegación ---
     try:
         enlaces_pagina = driver.find_elements(By.CSS_SELECTOR, 'a')
         driver.refresh()
         enlaces_refrescados = driver.find_elements(By.CSS_SELECTOR, 'a')
         if len(enlaces_pagina) == len(enlaces_refrescados):
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- La estructura de navegación es consistente en todas las páginas.")
         else:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- Advertencia: La estructura de navegación no es consistente.")
     except Exception as e:
         pass
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Retroalimentación Visual:", ln=True, align='L')
     # --- Criterio 7: Retroalimentación visual al interactuar con elementos de navegación ---
     try:
         botones_enlaces = driver.find_elements(By.CSS_SELECTOR, 'button, a')
@@ -819,32 +879,50 @@ def hdu_dos_tres(url):
                 time.sleep(1)
                 new_style = elemento.get_attribute('style')
                 if initial_style != new_style:
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
                     pdf.multi_cell(0, 6, f"- El elemento de navegación {idx} mostró retroalimentación visual.")
                 else:
+                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
                     pdf.multi_cell(0, 6, f"- Advertencia: El elemento de navegación {idx} no mostró retroalimentación visual.")
     except Exception as e:
-        pass
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 6, f"- No se encontraron elementos que ameriten retrolimentación visual.")
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Botón de Retroceso:", ln=True, align='L')
     # --- Criterio 8: Verificar botón de retroceso del navegador ---
     try:
         driver.back()
         time.sleep(1)
         if driver.current_url == url:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- El botón de retroceso del navegador funciona correctamente.")
         else:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- Advertencia: El botón de retroceso del navegador no devolvió a la página esperada.")
     except Exception as e:
         pass
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Ventanas Emergentes o PopUps:", ln=True, align='L')
     # --- Criterio 9: Verificar ausencia de ventanas emergentes o anuncios intrusivos ---
     try:
         popups = driver.find_elements(By.CSS_SELECTOR, '.popup, .modal, .advertisement')
         if popups:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- Advertencia: Se encontraron {len(popups)} ventanas emergentes o anuncios intrusivos.")
             for idx, popup in enumerate(popups, start=1):
                 popup.screenshot(os.path.join(screenshots_dir, f"popup_{idx}.png"))
                 print(f"Captura guardada: popup_{idx}.png")
         else:
+            pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+            pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
             pdf.multi_cell(0, 6, f"- No se encontraron ventanas emergentes o anuncios intrusivos.")
     except Exception as e:
         pass
@@ -926,12 +1004,13 @@ def hdu_dos_cuatro(url):
     text_element = driver.find_element(By.TAG_NAME, 'body')
     
     font_properties = get_font_properties(driver, text_element)
-
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", size=14)
+    pdf.cell(200, 10, txt="Criterio: Legibilidad del Texto", ln=True, align='C')
     # Agrega un título
-    pdf.set_font("Arial", "I", size=10)
-    pdf.cell(200, 10, txt="Legibilidad del Texto:", ln=True, align='L')
-    
     # Verificar tamaño de la fuente
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Tamaño de la Fuente:", ln=True, align='L')
     font_size = float(font_properties['font_size'].replace('px', ''))
     if font_size >= 16:
         pdf.set_font("Arial", size=8) # Añadimos un salto de línea
@@ -941,7 +1020,9 @@ def hdu_dos_cuatro(url):
         pdf.set_font("Arial", size=8) # Añadimos un salto de línea
         pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
         pdf.multi_cell(0, 6, f"- Tamaño de la fuente es menor a 16px: {font_size}px")
-    
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Tipo de Fuente:", ln=True, align='L')
     # Verificar tipo de fuente
     font_family = font_properties['font_family']
     if is_sans_serif(font_family):
@@ -954,6 +1035,8 @@ def hdu_dos_cuatro(url):
         pdf.multi_cell(0, 6, "- La fuente no es sans-serif: {}".format(font_family))
     
     # Verificar contraste
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Contraste:", ln=True, align='L')
     text_color = font_properties['color']
     background_color = font_properties['background_color']
     contrast_ratio = check_contrast(text_color, background_color)
@@ -967,6 +1050,8 @@ def hdu_dos_cuatro(url):
         pdf.multi_cell(0, 6, "- Contraste no cumple con WCAG AA: {:.2f}".format(contrast_ratio))
     
     # Verificar espaciado entre líneas
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Espaciado:", ln=True, align='L')
     line_height = font_properties['line_height']
     if line_height == 'normal':
         line_height = 1.2 * font_size  # Asume 1.2x si es 'normal'
@@ -1000,113 +1085,123 @@ def ejecutar_con_timeout(func, timeout, *args, **kwargs):
     else:
         return resultado[0]
 
-def hdu_dos_cinco(url, tiempo_limite_global=1, max_elementos=50):
-    # Inicializar Selenium WebDriver
-    options = webdriver.ChromeOptions()
-    options.add_argument('--headless')  # Ejecutar en modo sin cabeza para que no abra el navegador
-    options.add_argument('--window-size=1920,1080')
-    options.add_experimental_option("prefs", {"profile.default_content_setting_values.cookies": 2})  # Deshabilitar cookies para evitar redireccionamientos
-    options.add_argument('--disable-popup-blocking')
-    options.add_argument("--window-position=-2400,-2400")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+def hdu_dos_cinco(url):
+        # Inicializar Selenium WebDriver
+        start_time = time.time()  # Medir el tiempo de inicio
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')  # Ejecutar en modo sin cabeza para que no abra el navegador
+        options.add_argument('--window-size=1920,1080')
+        options.add_experimental_option("prefs", {"profile.default_content_setting_values.cookies": 2})  # Deshabilitar cookies para evitar redireccionamientos
+        options.add_argument('--disable-popup-blocking')
+        options.add_argument("--window-position=-2400,-2400")
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-    # Crear la carpeta 'capturas' si no existe
-    if not os.path.exists('capturas'):
-        os.makedirs('capturas')
+        pdf.ln(10)
+        pdf.set_font("Arial", "B", size=14)
+        pdf.cell(200, 10, txt="Criterio: Interacción con Elementos Clickables", ln=True, align='C')
 
-    # Agrega un título
-    pdf.set_font("Arial", "I", size=10)
-    pdf.cell(200, 10, txt="Interacción con Elementos Clickables:", ln=True, align='L')
+        # Crear la carpeta 'capturas' si no existe
+        if not os.path.exists('capturasSelenium'):
+            os.makedirs('capturasSelenium')
+        
+        try:
+            # Abrir la página web
+            driver.get(url)
+            WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Esperar a que se cargue la página
+            page_source = driver.page_source
 
-    # Temporizador global
-    tiempo_inicio = time.time()
+            # Usar BeautifulSoup para analizar el código fuente de la página
+            soup = BeautifulSoup(page_source, 'html.parser')
 
-    try:
-        # Abrir la página web
-        driver.get(url)
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))  # Esperar a que se cargue la página
-        page_source = driver.page_source
+            # Encontrar todos los enlaces y botones en la página
+            elementos = soup.find_all(['a', 'button'])
+            textos_visitados = set()
 
-        # Usar BeautifulSoup para analizar el código fuente de la página
-        soup = BeautifulSoup(page_source, 'html.parser')
+            botones_pequenos = []
+            espaciado_insuficiente = []
+            botones_no_atenuados = []
+            sin_cambio_visual = []
 
-        # Encontrar todos los enlaces y botones en la página
-        elementos = soup.find_all(['a', 'button'])
-        textos_visitados = set()
+            # Filtrar los elementos relevantes antes de iterar
+            elementos_filtrados = [el for el in elementos if el.text.strip() and el.name in ['a', 'button']]
 
-        botones_pequenos = []
-        espaciado_insuficiente = []
-        botones_no_atenuados = []
-        sin_cambio_visual = []
+            # Verificar cambios visuales en los elementos encontrados
+            for idx, elemento in enumerate(elementos_filtrados):
+                # Obtener el texto del elemento
+                texto_elemento = elemento.text.strip()
 
-        # Limitar la cantidad de elementos que se analizarán
-        elementos = elementos[:max_elementos]
-
-        # Verificar cambios visuales en los elementos encontrados
-        for idx, elemento in enumerate(elementos):
-            # Verificar si el tiempo límite global ha sido alcanzado
-            if time.time() - tiempo_inicio > tiempo_limite_global:
-                print("Tiempo límite global alcanzado. Deteniendo el análisis.")
-                break
-
-            # Obtener el texto del elemento
-            texto_elemento = elemento.text.strip()
-
-            # Saltar elementos con texto duplicado
-            if texto_elemento in textos_visitados:
-                continue
-            textos_visitados.add(texto_elemento)
-
-            # Encontrar el elemento en Selenium por el texto
-            try:
-                if elemento.name == 'a':
-                    selenium_elemento = WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.LINK_TEXT, texto_elemento))
-                    )
-                elif elemento.name == 'button':
-                    selenium_elemento = WebDriverWait(driver, 10).until(
-                        EC.presence_of_element_located((By.XPATH, f"//button[contains(text(), '{texto_elemento}')]"))
-                    )
-                else:
+                # Saltar elementos con texto duplicado
+                if texto_elemento in textos_visitados:
                     continue
-            except:
-                # Si no se puede encontrar el elemento, continuar con el siguiente
-                continue
+                textos_visitados.add(texto_elemento)
 
-            # Verificar si el elemento es visible
-            if not selenium_elemento.is_displayed():
-                continue
+                # Encontrar el elemento en Selenium por el texto
+                try:
+                    if elemento.name == 'a':
+                        selenium_elemento = WebDriverWait(driver, 5).until(
+                            EC.presence_of_element_located((By.LINK_TEXT, texto_elemento))
+                        )
+                    elif elemento.name == 'button':
+                        selenium_elemento = WebDriverWait(driver, 5).until(
+                            EC.presence_of_element_located((By.XPATH, f"//button[contains(text(), '{texto_elemento}')]"))
+                        )
+                    else:
+                        continue
+                except:
+                    # Si no se puede encontrar el elemento, continuar con el siguiente
+                    continue
 
-            # Verificar el tamaño del elemento
-            ejecutar_con_timeout(verificar_tamaño_elemento, 60, selenium_elemento, texto_elemento, botones_pequenos)
+                # Verificar si el elemento es visible
+                if not selenium_elemento.is_displayed():
+                    continue
 
-            # Verificar el espaciado mínimo entre elementos clickeables
-            ejecutar_con_timeout(verificar_espaciado_elementos, 60, driver, selenium_elemento, texto_elemento, espaciado_insuficiente)
+                # Crear una lista de tareas para procesar en paralelo
+                tasks = [
+                    (verificar_tamaño_elemento, selenium_elemento, texto_elemento),
+                    (verificar_espaciado_elementos, driver, selenium_elemento, texto_elemento),
+                    (verificar_boton_desactivado, driver, selenium_elemento, texto_elemento),
+                    (verificar_cambio_visual, driver, selenium_elemento, texto_elemento, idx)
+                ]
 
-            # Verificar si el elemento está desactivado
-            ejecutar_con_timeout(verificar_boton_desactivado, 60, driver, selenium_elemento, texto_elemento, botones_no_atenuados)
-            if selenium_elemento.get_attribute('disabled') is not None:
-                continue
+                # Procesar cada tarea secuencialmente y almacenar el resultado
+                for task in tasks:
+                    func = task[0]
+                    args = task[1:]
+                    result = func(*args)
+                    if result:
+                        if func == verificar_tamaño_elemento:
+                            botones_pequenos.append(result)
+                        elif func == verificar_espaciado_elementos:
+                            espaciado_insuficiente.append(result)
+                        elif func == verificar_boton_desactivado:
+                            botones_no_atenuados.append(result)
+                        elif func == verificar_cambio_visual:
+                            sin_cambio_visual.append(result)
 
-            # Verificar cambios visuales al hacer clic
-            ejecutar_con_timeout(verificar_cambio_visual, 60, driver, selenium_elemento, texto_elemento, idx, sin_cambio_visual)
-    finally:
-        # Cerrar el navegador
-        driver.quit()
+            # Imprimir resultados en orden
+            imprimir_resultados(botones_pequenos, espaciado_insuficiente, botones_no_atenuados, sin_cambio_visual)
 
-def verificar_tamaño_elemento(selenium_elemento, texto_elemento, botones_pequenos):
+        finally:
+            # Cerrar el navegador
+            driver.quit()
+            end_time = time.time()  # Medir el tiempo de finalización
+            elapsed_time = (end_time - start_time)/60
+            print(f"Tiempo total de ejecución: {elapsed_time:.2f} minutos")
+
+
+def verificar_tamaño_elemento(selenium_elemento, texto_elemento):
     # Verificar si el tamaño del elemento es válido (no debe ser 0 de ancho o alto)
     tamaño = selenium_elemento.size
     if tamaño['width'] == 0 or tamaño['height'] == 0:
-        return
+        return None
 
     # Verificar si el botón cumple con el tamaño mínimo de 44x44 píxeles
     if tamaño['width'] < 44 or tamaño['height'] < 44:
-        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-        pdf.multi_cell(0, 6, f"- El botón con texto '{texto_elemento}' no cumple con el tamaño mínimo de 44x44 píxeles.")
-        
-def verificar_espaciado_elementos(driver, selenium_elemento, texto_elemento, espaciado_insuficiente):
+        return f"El botón con texto '{texto_elemento}' no cumple con el tamaño mínimo de 44x44 píxeles. Tamaño actual: {tamaño['width']}x{tamaño['height']}"
+    return None
+
+
+def verificar_espaciado_elementos(driver, selenium_elemento, texto_elemento):
     # Verificar el espaciado mínimo entre elementos clickeables (mínimo de 8 píxeles)
     try:
         location = selenium_elemento.location
@@ -1119,18 +1214,17 @@ def verificar_espaciado_elementos(driver, selenium_elemento, texto_elemento, esp
                 distancia_horizontal = abs(location['x'] - location_otro['x'])
                 distancia_vertical = abs(location['y'] - location_otro['y'])
                 if distancia_horizontal < 8 and distancia_vertical < 8:
-                    pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                    pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                    pdf.multi_cell(0, 6, f"- El elemento con texto '{texto_elemento}' no cumple con el espaciado mínimo de 8 píxeles con respecto a otros elementos clickeables.")
-                    break
+                    return f"El elemento con texto '{texto_elemento}' no cumple con el espaciado mínimo de 8 píxeles con respecto a otros elementos clickeables."
             except:
                 # Ignorar errores de obtención de propiedades de otros elementos
                 continue
     except:
         # Ignorar errores de verificación del espaciado
         pass
+    return None
 
-def verificar_boton_desactivado(driver, selenium_elemento, texto_elemento, botones_no_atenuados):
+
+def verificar_boton_desactivado(driver, selenium_elemento, texto_elemento):
     try:
         # Comparar el estilo del botón desactivado con un botón activo
         color_fondo_desactivado = selenium_elemento.value_of_css_property('background-color')
@@ -1151,14 +1245,14 @@ def verificar_boton_desactivado(driver, selenium_elemento, texto_elemento, boton
             diferencia_contraste = np.mean(np.abs(np.array(color_activo) - np.array(color_desactivado)))
             porcentaje_atenuacion = (1 - (diferencia_contraste / 255)) * 100
             if porcentaje_atenuacion < 50:  # Ajustar el umbral según sea necesario
-                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
-                pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                pdf.multi_cell(0, 6, f"- El botón con texto '{texto_elemento}' no está suficientemente atenuado. Diferencia de contraste: {diferencia_contraste:.2f}, Porcentaje de atenuación: {porcentaje_atenuacion:.2f}%")
+                return f"El botón con texto '{texto_elemento}' no está suficientemente atenuado. Diferencia de contraste: {diferencia_contraste:.2f}, Porcentaje de atenuación: {porcentaje_atenuacion:.2f}%"
     except:
         # Ignorar errores al verificar el contraste del botón desactivado
         pass
+    return None
 
-def verificar_cambio_visual(driver, selenium_elemento, texto_elemento, idx, sin_cambio_visual):
+
+def verificar_cambio_visual(driver, selenium_elemento, texto_elemento, idx):
     try:
         # Desplazar el elemento a la vista
         driver.execute_script("arguments[0].scrollIntoView(true);", selenium_elemento)
@@ -1179,8 +1273,8 @@ def verificar_cambio_visual(driver, selenium_elemento, texto_elemento, idx, sin_
         action.release().perform()
 
         # Comparar las dos imágenes para detectar cambios visuales
-        img_antes = Image.open(BytesIO(area_antes))
-        img_despues = Image.open(BytesIO(area_despues))
+        img_antes = Image.open(io.BytesIO(area_antes))
+        img_despues = Image.open(io.BytesIO(area_despues))
 
         # Verificar si las imágenes tienen el mismo tamaño
         if img_antes.size != img_despues.size:
@@ -1192,14 +1286,54 @@ def verificar_cambio_visual(driver, selenium_elemento, texto_elemento, idx, sin_
 
         if diferencia <= umbral_cambio:
             # Guardar las capturas de aquellos elementos que no cumplen la condición
-            with open(f'capturas/elemento_{idx}_antes.png', 'wb') as file:
+            with open(f'capturasSelenium/elemento_{idx}_antes.png', 'wb') as file:
                 file.write(area_antes)
-            with open(f'capturas/elemento_{idx}_despues.png', 'wb') as file:
+            with open(f'capturasSelenium/elemento_{idx}_despues.png', 'wb') as file:
                 file.write(area_despues)
-            sin_cambio_visual.append(f"El elemento con texto '{texto_elemento}' no tiene un cambio visual perceptible después del clic.")
+            return f"El elemento con texto '{texto_elemento}' no tiene un cambio visual perceptible después del clic."
     except:
         # Ignorar errores al comparar las imágenes
         pass
+    return None
+
+
+def imprimir_resultados(botones_pequenos, espaciado_insuficiente, botones_no_atenuados, sin_cambio_visual):
+    print("\nResultados de la verificación:")
+
+    print("\nBotones que no cumplen con el tamaño mínimo de 44x44 píxeles:")
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Tamaño Elementos:", ln=True, align='L')
+    for mensaje in botones_pequenos:
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 6, f"-{mensaje}")
+
+    print("\nElementos con espaciado insuficiente:")
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Espaciado Entre Elementos:", ln=True, align='L')
+    for mensaje in espaciado_insuficiente:
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 6, f"-{mensaje}")
+
+
+    print("\nBotones desactivados que no están suficientemente atenuados:")
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Contraste:", ln=True, align='L')
+    for mensaje in botones_no_atenuados:
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 6, f"-{mensaje}")
+
+
+    print("\nElementos que no tienen un cambio visual perceptible después del clic:")
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Cambio Visual:", ln=True, align='L')
+    for mensaje in sin_cambio_visual:
+        pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+        pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
+        pdf.multi_cell(0, 6, f"-{mensaje}")
+
 
 
 # Configuración para Chrome en modo headless
@@ -1215,17 +1349,19 @@ def setup_driver():
 # Función principal para analizar la usabilidad
 def hdu_dos_seis(url):
     driver = setup_driver()
-
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", size=14)
+    pdf.cell(200, 10, txt="Criterio: Carga Cognitiva y Organización Visual", ln=True, align='C')
     # Navegar a la URL
     driver.get(url)
-
-    pdf.set_font("Arial", "I", size=10)
-    pdf.cell(200, 10, txt="Carga Cognitiva y Organización Visual:", ln=True, align='L')
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", size=14)
+    pdf.cell(200, 10, txt="Carga Cognitiva y Organización Visual", ln=True, align='C')
     # Esperar a que la página se cargue completamente
     time.sleep(3)
     # Agrega un título
     pdf.set_font("Arial", "I", size=10)
-    pdf.cell(200, 10, txt="Legibilidad del Texto:", ln=True, align='L')
+    pdf.cell(200, 10, txt="Encabezados:", ln=True, align='L')
 
     # Criterio 1: Verificar encabezados H1, H2, H3
     try:
@@ -1249,6 +1385,8 @@ def hdu_dos_seis(url):
     except Exception as e:
         print(f"Error en la verificación de encabezados: {str(e)}")
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Paleta de Colores:", ln=True, align='L')
     # Criterio 2: Verificación de la paleta de colores limitada
     try:
         body = driver.find_element(By.TAG_NAME, "body")
@@ -1260,6 +1398,9 @@ def hdu_dos_seis(url):
     except Exception as e:
         print(f"Error al analizar la paleta de colores: {str(e)}")
 
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Animaciones y Elementos en Movimiento:", ln=True, align='L')
     # Criterio 3: Verificación de animaciones y elementos en movimiento
     try:
         animated_elements = driver.find_elements(By.CSS_SELECTOR, "*[style*='animation']")
@@ -1269,6 +1410,8 @@ def hdu_dos_seis(url):
     except Exception as e:
         print(f"Error al analizar animaciones: {str(e)}")
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Tamaño de Títulos:", ln=True, align='L')
     # Criterio 4: Verificación del tamaño de los títulos
     try:
         for h1 in h1_elements:
@@ -1292,6 +1435,8 @@ def hdu_dos_seis(url):
     except Exception as e:
         print(f"Error en la verificación de tamaño de títulos: {str(e)}")
 
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Opciones Interactivas:", ln=True, align='L')
     # Criterio 5: Verificación de opciones interactivas
     try:
         interactive_elements = driver.find_elements(By.CSS_SELECTOR, "a, button, input[type='submit'], input[type='button']")
@@ -1333,16 +1478,22 @@ def verificar_iconos_ayuda(driver):
 def verificar_lenguaje_sencillo(driver):
     try:
         help_texts = driver.find_elements(By.XPATH, "//*[contains(@class, 'help-text') or contains(@class, 'tooltip') or @role='tooltip' or contains(translate(@href, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'help') or contains(translate(@href, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'ayuda') or contains(translate(@href, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'support') or contains(translate(@href, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'faq') or contains(translate(@href, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'assist') or contains(translate(@href, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'hilfe') or contains(translate(@href, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'ajuda') or contains(translate(@href, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'assistance')]")
+        
         for help_text in help_texts:
-            text = help_text.text.strip().lower()
+            # Limpiar el texto de saltos de línea y espacios innecesarios
+            text = help_text.text.replace('\n', ' ').strip().lower()
+            
             if text and any(word in text for word in ["complejo", "difícil", "técnico", "complicado", "schwierig", "tecnológico"]):
-                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_font("Arial", size=8)  # Añadimos un salto de línea
                 pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                pdf.multi_cell(0, 6, f"- Advertencia: El texto de ayuda contiene lenguaje complejo: '{help_text.text}'")
+                help_text_clean = help_text.text.replace('\n', ' ').strip()
+                pdf.multi_cell(0, 6, f"- Advertencia: El texto de ayuda contiene lenguaje complejo: ' {help_text_clean}'")
             elif text:
-                pdf.set_font("Arial", size=8) # Añadimos un salto de línea
+                pdf.set_font("Arial", size=8)  # Añadimos un salto de línea
                 pdf.set_x(15)  # Aquí es donde se establece la sangría (20 puntos hacia la derecha)
-                pdf.multi_cell(0, 6, f"- Texto de ayuda verificado: '{help_text.text}'")
+                help_text_clean = help_text.text.replace('\n', ' ').strip()
+                pdf.multi_cell(0, 6, f"- Texto de ayuda verificado: '{help_text_clean}'")
+    
     except Exception as e:
         print(f"Error en la verificación del lenguaje de la ayuda: {str(e)}")
 
@@ -1367,15 +1518,21 @@ def hdu_dos_siete(url):
 
     # Navegar a la URL
     driver.get(url)
-
-    pdf.set_font("Arial", "I", size=10)
-    pdf.cell(200, 10, txt="Ayuda Contextual:", ln=True, align='L')
+    pdf.ln(10)
+    pdf.set_font("Arial", "B", size=14)
+    pdf.cell(200, 10, txt="Criterio: Ayuda Contextual", ln=True, align='C')
     # Esperar a que la página se cargue completamente
     time.sleep(3)
 
     # Verificar los diferentes criterios
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Iconos de Ayuda:", ln=True, align='L')
     verificar_iconos_ayuda(driver)
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Lenguaje Sencillo:", ln=True, align='L')
     verificar_lenguaje_sencillo(driver)
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Acceso a Tutoriales:", ln=True, align='L')
     verificar_acceso_tutoriales(driver)
 
     # Cerrar el driver al final
@@ -1384,16 +1541,194 @@ def hdu_dos_siete(url):
 for categoria in categorias:
     if categoria == "Retroalimentacion de Acciones":
         hdu_dos_dos(url)
-    elif categoria == "Facilidad de Navegación":
+    elif categoria == "Facilidad de Navegacion":
         hdu_dos_tres(url)
     elif categoria ==  "Legibilidad del Texto":
         hdu_dos_cuatro(url)
-    elif categoria ==   "Interacción con Elementos Clickables":
+    elif categoria ==   "Interaccion con Elementos Clickables":
         hdu_dos_cinco(url)
-    elif categoria ==  "Cognitiva y Organización Visual":
+    elif categoria ==  "Cognitiva y Organizacion Visual":
         hdu_dos_seis(url)
     elif categoria ==   "Ayuda Contextual":
         hdu_dos_siete(url)
+
+
+# Ejemplo de uso
+#hdu_dos_dos('https://www.mercadolibre.cl')
+#hdu_dos_tres('https://www.mercadolibre.cl')
+#hdu_dos_cuatro('https://www.mercadolibre.cl')
+#hdu_dos_cinco('https://www.gov.uk/')
+#hdu_dos_seis('https://www.mercadolibre.cl') 
+#hdu_dos_siete('https://www.mercadolibre.cl')
+
+# Añadir la portada del documento
+
+# Parte 1: Añadir las imágenes de las clases 'icon' e 'image'
+output_icon_dir = "output_icon"  # Directorio con las imágenes de Icon e Image
+for class_dir in ['icon', 'image']:
+    class_path = os.path.join(output_icon_dir, class_dir)
+
+    if os.path.isdir(class_path):
+        class_images = [img for img in os.listdir(class_path) if img.endswith(('.jpg', '.jpeg', '.png'))]
+
+        if class_images:
+            # Añadir una nueva página para cada clase y su conteo
+            pdf.add_page()
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 10, f"Capturas con los elementos '{class_dir}' destacados", ln=True)
+            pdf.ln(10)
+
+            # Añadir las imágenes (máximo 2 por página)
+            image_counter = 0
+            for i, image_file in enumerate(class_images, 1):
+                if image_counter == 2:
+                    # Añadir nueva página si alcanzamos el límite de 2 imágenes
+                    pdf.add_page()
+                    pdf.set_font("Arial", "B", 12)
+                    pdf.cell(0, 10, f"Capturas con los elementos '{class_dir}' destacados (continuación)", ln=True)
+                    pdf.ln(10)
+                    image_counter = 0
+
+                # Añadir la imagen de la clase
+                image_path = os.path.join(class_path, image_file)
+                try:
+                    with Image.open(image_path) as img:
+                        original_image_width, original_image_height = img.size
+
+                    # Calcular las dimensiones para el PDF
+                    pdf_width, pdf_height = pdf.w - 20, pdf.h - 40  # Ajustar para margen
+                    aspect_ratio = original_image_width / original_image_height
+
+                    # Ajustar el tamaño de la imagen manteniendo su aspecto
+                    if original_image_width > pdf_width:
+                        img_width = pdf_width
+                        img_height = pdf_width / aspect_ratio
+                    else:
+                        img_width = original_image_width
+                        img_height = original_image_height
+
+                    # Limitar la altura para asegurar que no se salga de la página
+                    if img_height > pdf_height / 2:
+                        img_height = pdf_height / 2
+                        img_width = img_height * aspect_ratio
+
+                    # Verificar si hay suficiente espacio para la imagen
+                    if pdf.get_y() + img_height > pdf.h - 20:
+                        pdf.add_page()
+
+                    # Calcular la posición centrada de la imagen
+                    x_image = (pdf.w - img_width) / 2
+                    y_image = pdf.get_y()
+
+                    # Insertar la imagen
+                    pdf.image(image_path, x=x_image, y=y_image, w=img_width, h=img_height)
+
+                    # Dibujar el borde alrededor de la imagen
+                    pdf.set_draw_color(0, 0, 0)
+                    pdf.rect(x_image, y_image, img_width, img_height)
+
+                    # Ajustar el offset en Y para la siguiente imagen
+                    pdf.ln(img_height + 10)
+                    image_counter += 1
+                except Exception as e:
+                    print(f"Error al procesar la imagen {image_file}: {e}")
+
+# Parte 2: Añadir las imágenes de las demás clases
+y_offset = None  # Reiniciar el offset en Y para la siguiente clase
+current_x = 10  # Posición X inicial
+spacing_x = 10  # Espacio entre las imágenes
+margin = 10  # Margen entre las imágenes y los bordes
+max_image_height = 0
+add_page_flag = True  # Controla si es necesario añadir una nueva página al comenzar
+
+output_cingoz_dir = "output_cingoz"  # Directorio principal para otras clases
+for class_dir in os.listdir(output_cingoz_dir):
+    class_path = os.path.join(output_cingoz_dir, class_dir)
+
+    if os.path.isdir(class_path) and class_dir not in ['icon', 'image']:
+        class_images = [img for img in os.listdir(class_path) if img.endswith(('.jpg', '.jpeg', '.png'))]
+
+        if class_images:
+            if add_page_flag:
+                pdf.add_page()
+                add_page_flag = False
+
+            # Añadir el conteo de imágenes reconocidas para cada clase
+            pdf.set_font("Arial", "B", 12)
+            class_count = len(class_images)
+            pdf.cell(0, 10, f"Numero de elementos de la clase '{class_dir}' encontrados: {class_count}", ln=True)
+            pdf.ln(10)
+
+            # Añadir las imágenes en una lista (una sobre otra)
+            for i, image_file in enumerate(class_images, 1):
+                image_path = os.path.join(class_path, image_file)
+                try:
+                    with Image.open(image_path) as img:
+                        original_width, original_height = img.size
+
+                    original_width_mm = original_width * 0.264583
+                    original_height_mm = original_height * 0.264583
+
+                    # Verificar si se requiere una nueva página antes de añadir la imagen
+                    if pdf.get_y() + original_height_mm > pdf.h - 20:
+                        pdf.add_page()
+                        pdf.set_font("Arial", "B", 12)
+                        pdf.cell(0, 10, f"Numero de elementos de la clase '{class_dir}' encontrados (continuación):", ln=True)
+                        pdf.ln(10)
+
+                    y_pos = pdf.get_y()
+                    pdf.set_draw_color(0, 0, 0)
+                    pdf.rect(10 - 1, y_pos - 1, original_width_mm + 2, original_height_mm + 2)
+                    pdf.image(image_path, x=10, y=y_pos, w=original_width_mm)
+                    pdf.ln(original_height_mm + 10)
+                except Exception as e:
+                    print(f"Error al procesar la imagen {image_file}: {e}")
+
+# Parte 3: Añadir las imágenes de ProgressBar
+output_pb_dir = "output_pb"  # Asegúrate de que este directorio exista
+progressbar_images = [img for img in os.listdir(output_pb_dir) if img.endswith(('.jpg', '.jpeg', '.png'))]
+
+if progressbar_images:
+    if current_x != 10:  # Si aún hay espacio en la página actual, continuamos
+        pdf.ln(max_image_height + 10)
+    else:
+        pdf.add_page()
+
+    pdf.set_font("Arial", "B", 12)
+    progressbar_count = len(progressbar_images)
+    pdf.cell(0, 10, f"Barras de progreso encontradas: {progressbar_count}", ln=True)
+    pdf.ln(10)
+
+    # Añadir las imágenes de ProgressBar con el mismo formato
+y_offset = None
+current_x = 10
+max_image_height = 0
+
+for i, image_file in enumerate(progressbar_images, 1):
+    image_path = os.path.join(output_pb_dir, image_file)
+    try:
+        with Image.open(image_path) as img:
+            original_width, original_height = img.size
+
+        original_width_mm = original_width * 0.264583
+        original_height_mm = original_height * 0.264583
+
+        # Verificar si se requiere una nueva página antes de añadir la imagen
+        if pdf.get_y() + original_height_mm > pdf.h - 20:
+            pdf.add_page()
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(0, 10, "Barras de progreso encontradas (continuación):", ln=True)
+            pdf.ln(10)
+            current_x = 10
+            max_image_height = 0
+
+        y_pos = pdf.get_y()
+        pdf.set_draw_color(0, 0, 0)
+        pdf.rect(10 - 1, y_pos - 1, original_width_mm + 2, original_height_mm + 2)
+        pdf.image(image_path, x=10, y=y_pos, w=original_width_mm)
+        pdf.ln(original_height_mm + 10)
+    except Exception as e:
+        print(f"Error al procesar la imagen {image_file}: {e}")
 
 
 # Inicializa Firebase

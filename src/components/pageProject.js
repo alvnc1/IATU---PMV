@@ -16,8 +16,8 @@ function ProjectPage() {
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [videoUrl, setVideoUrl] = useState(''); // Nuevo estado para la URL del video
-  const [showVideoModal, setShowVideoModal] = useState(false); // Nuevo estado para controlar la visibilidad del modal de video
+  const [videoUrl, setVideoUrl] = useState('');
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const [sortOrder, setSortOrder] = useState('asc');
   const [testStatus, setTestStatus] = useState({});
   const [projectName, setProjectName] = useState(''); 
@@ -50,16 +50,14 @@ function ProjectPage() {
       }
     });
   
-    // Aquí actualizamos el estado según si el pdfUrl existe o no
     const updatedStatus = {};
     tasksList.forEach(task => {
       updatedStatus[task.id] = task.pdfUrl ? 'Finalizado' : (testStatus[task.id] || 'Pendiente');
     });
   
     setTasks(tasksList);
-    setTestStatus(updatedStatus); // Actualizamos el estado de las tareas
+    setTestStatus(updatedStatus);
   };
-  
 
   const deleteTask = async (taskId) => {
     try {
@@ -117,6 +115,10 @@ function ProjectPage() {
       body: JSON.stringify({ videoUrl, urlTarea, categorias, idT, idP })
     })
     .then(response => response.json())
+    .then(() => {
+      // Obtener tareas actualizadas después de que el script haya terminado de ejecutarse
+      getTasks();
+    })
     .catch(error => {
       console.error('Error al ejecutar el script de Python:', error);
       setTestStatus(prevStatus => ({
@@ -129,30 +131,18 @@ function ProjectPage() {
     });
   };
 
-  // Función para manejar la descarga del PDF
   const handleDownloadPDF = (pdfUrl, taskId) => {
     if (!pdfUrl) return;
   
-    // Crear un enlace temporal para forzar la descarga
     const link = document.createElement('a');
     link.href = pdfUrl;
-  
-    // Abrir en una nueva ventana o pestaña
     link.target = '_blank';
-
-    // Forzar la descarga del archivo utilizando el atributo 'download'
     link.setAttribute('download', `${taskId}_informe.pdf`);
-  
-    // Añadir el enlace al DOM y simular el clic para iniciar la descarga
     document.body.appendChild(link);
     link.click();
-  
-    // Eliminar el enlace después de que se haya descargado el archivo
     document.body.removeChild(link);
   };
-  
 
-  // Maneja la reproducción del video
   const handleShowVideoModal = (task) => {
     const videoFile = task.files.find(file => file.url);
     if (videoFile) {
@@ -201,13 +191,13 @@ function ProjectPage() {
                 <tr key={task.id}>
                   <td className="text-truncate">{task.nombreTarea}</td>
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
-                  <td>{testStatus[task.id]}</td> {/* Mostrar el estado actualizado */}
+                  <td>{testStatus[task.id]}</td>
                   <td>
                     <Button
                       variant="outline-primary"
                       onClick={() => handleDownloadPDF(task.pdfUrl, task.id)}
                       className="me-2 pdf-button"
-                      disabled={!task.pdfUrl}  // Deshabilitar el botón si no hay pdfUrl
+                      disabled={!task.pdfUrl}
                     >
                       PDF
                     </Button>

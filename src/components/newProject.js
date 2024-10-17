@@ -24,17 +24,61 @@ function NewProject() {
 
     const auth = getAuth();  // Inicializamos Firebase Auth
 
-    const categorias = [
-        "Página de Inicio",
-        "Orientación de Tareas",
-        "Navegabilidad",
-        "Formularios",
-        "Confianza y Credibilidad",
-        "Calidad del Contenido",
-        "Diagramación y Diseño",
-        "Sección de Búsquedas",
-        "Sección de Reconocimiento de Errores y Retroalimentación"
-    ];
+    const categorias = {
+        Usabilidad: [
+            "Página de Inicio",
+            "Orientación de Tareas",
+            "Navegabilidad",
+            "Formularios",
+            "Confianza y Credibilidad",
+            "Calidad del Contenido",
+            "Diagramación y Diseño",
+            "Sección de Búsquedas",
+            "Sección de Reconocimiento de Errores y Retroalimentación"
+        ],
+        "Adultos Mayores": [
+            "Retroalimentacion de Acciones",
+            "Facilidad de Navegacion",
+            "Legibilidad del Texto",
+            "Interaccion con Elementos Clickables",
+            "Cognitiva y Organizacion Visual",
+            "Ayuda Contextual"
+        ],
+        Accesibilidad: []  // De momento vacío
+    };
+
+    const renderSubMenu = (title, items) => (
+        <Dropdown drop="right" className="submenu">
+            <Dropdown.Toggle as="div" className="submenu-item">{title}</Dropdown.Toggle>
+            <Dropdown.Menu>
+                {items.map((item) => (
+                    <Dropdown.Item key={item}>
+                        <Form.Check
+                            type="checkbox"
+                            label={item}
+                            checked={selectedCategorias.includes(item)}
+                            onChange={() => handleCategoriaChange(item)}
+                        />
+                    </Dropdown.Item>
+                ))}
+            </Dropdown.Menu>
+        </Dropdown>
+    );
+
+    const renderCategoriasMenu = () => (
+        <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" id="dropdown-basic">
+                Selecciona las categorías
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+                {Object.entries(categorias).map(([key, values]) => (
+                    values.length > 0 ? renderSubMenu(key, values) : (
+                        <Dropdown.ItemText key={key}>{key}</Dropdown.ItemText>
+                    )
+                ))}
+            </Dropdown.Menu>
+        </Dropdown>
+    );
 
     const handleNombreProyectoChange = (e) => {
         setNombreProyecto(e.target.value);
@@ -206,18 +250,7 @@ function NewProject() {
                         
                         <Form.Group controlId="formBasicCategoriaTareas">
                             <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Categoría de la Tarea</Form.Label>
-                            <DropdownButton id="dropdown-basic-button" title="Selecciona las categorías" variant="outline-secondary">
-                                {categorias.map((categoria) => (
-                                    <Dropdown.Item key={categoria} as="button">
-                                        <Form.Check
-                                            type="checkbox"
-                                            label={categoria}
-                                            checked={selectedCategorias.includes(categoria)}
-                                            onChange={() => handleCategoriaChange(categoria)}
-                                        />
-                                    </Dropdown.Item>
-                                ))}
-                            </DropdownButton>
+                            {renderCategoriasMenu()}
                         </Form.Group>
 
                         <Form.Group controlId="formBasicUrlTarea">

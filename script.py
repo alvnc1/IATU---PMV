@@ -2547,6 +2547,7 @@ task_ref.update({
 })
 
 print(f"URL del PDF guardada en Firestore: {pdf_url}")
+print("Estoy en Script")
 
 # Generar y guardar el PDF
 #pdf.output(f"public/informe.pdf")
