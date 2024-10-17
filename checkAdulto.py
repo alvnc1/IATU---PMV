@@ -1273,8 +1273,8 @@ def verificar_cambio_visual(driver, selenium_elemento, texto_elemento, idx):
         action.release().perform()
 
         # Comparar las dos imágenes para detectar cambios visuales
-        img_antes = Image.open(io.BytesIO(area_antes))
-        img_despues = Image.open(io.BytesIO(area_despues))
+        img_antes = Image.open(BytesIO(area_antes))
+        img_despues = Image.open(BytesIO(area_despues))
 
         # Verificar si las imágenes tienen el mismo tamaño
         if img_antes.size != img_despues.size:
