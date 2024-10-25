@@ -61,34 +61,26 @@ function NewTask() {
         });
     };
 
-    const renderSubMenu = (title, items) => (
-        <Dropdown drop="right" className="submenu">
-            <Dropdown.Toggle as="div" className="submenu-item">{title}</Dropdown.Toggle>
-            <Dropdown.Menu>
-                {items.map((item) => (
-                    <Dropdown.Item key={item}>
-                        <Form.Check
-                            type="checkbox"
-                            label={item}
-                            checked={selectedCategorias.includes(item)}
-                            onChange={() => handleCategoriaChange(item)}
-                        />
-                    </Dropdown.Item>
-                ))}
-            </Dropdown.Menu>
-        </Dropdown>
-    );
-
     const renderCategoriasMenu = () => (
         <Dropdown>
             <Dropdown.Toggle variant="outline-secondary" id="dropdown-basic">
                 Selecciona las categorías
             </Dropdown.Toggle>
             <Dropdown.Menu>
-                {Object.entries(categorias).map(([key, values]) => (
-                    values.length > 0 ? renderSubMenu(key, values) : (
-                        <Dropdown.ItemText key={key}>{key}</Dropdown.ItemText>
-                    )
+                {Object.keys(categorias).map((key) => (
+                    <Dropdown.ItemText key={key}>
+                        <strong>{key}</strong>
+                        {categorias[key].map((subItem) => (
+                            <Form.Check
+                                type="checkbox"
+                                label={subItem}
+                                key={subItem}
+                                checked={selectedCategorias.includes(subItem)}
+                                onChange={() => handleCategoriaChange(subItem)}
+                                style={{ marginLeft: '20px' }}  // Agregar margen para diferenciar visualmente
+                            />
+                        ))}
+                    </Dropdown.ItemText>
                 ))}
             </Dropdown.Menu>
         </Dropdown>
@@ -163,7 +155,7 @@ function NewTask() {
                         padding: "20px",
                         width: "90%", 
                         maxWidth: "1200px", 
-                        height: "80vh", 
+                        height: "auto", 
                         overflowY: "auto", 
                         boxShadow: "0px 0px 10px 0px rgba(0,0,0,0.1)", 
                     }}

@@ -5,7 +5,6 @@ import Container from "react-bootstrap/Container";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Dropdown from 'react-bootstrap/Dropdown';
-import DropdownButton from 'react-bootstrap/DropdownButton';
 import { MdSave } from "react-icons/md";
 import { db, storage } from "./firebase"; 
 import { doc, setDoc, collection } from "firebase/firestore";
@@ -47,39 +46,6 @@ function NewProject() {
         Accesibilidad: []  // De momento vacío
     };
 
-    const renderSubMenu = (title, items) => (
-        <Dropdown drop="right" className="submenu">
-            <Dropdown.Toggle as="div" className="submenu-item">{title}</Dropdown.Toggle>
-            <Dropdown.Menu>
-                {items.map((item) => (
-                    <Dropdown.Item key={item}>
-                        <Form.Check
-                            type="checkbox"
-                            label={item}
-                            checked={selectedCategorias.includes(item)}
-                            onChange={() => handleCategoriaChange(item)}
-                        />
-                    </Dropdown.Item>
-                ))}
-            </Dropdown.Menu>
-        </Dropdown>
-    );
-
-    const renderCategoriasMenu = () => (
-        <Dropdown>
-            <Dropdown.Toggle variant="outline-secondary" id="dropdown-basic">
-                Selecciona las categorías
-            </Dropdown.Toggle>
-            <Dropdown.Menu>
-                {Object.entries(categorias).map(([key, values]) => (
-                    values.length > 0 ? renderSubMenu(key, values) : (
-                        <Dropdown.ItemText key={key}>{key}</Dropdown.ItemText>
-                    )
-                ))}
-            </Dropdown.Menu>
-        </Dropdown>
-    );
-
     const handleNombreProyectoChange = (e) => {
         setNombreProyecto(e.target.value);
     };
@@ -105,6 +71,31 @@ function NewProject() {
             }
         });
     };
+
+    const renderCategoriasMenu = () => (
+        <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" id="dropdown-basic">
+                Selecciona las categorías
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+                {Object.keys(categorias).map((key) => (
+                    <Dropdown.ItemText key={key}>
+                        <strong>{key}</strong>
+                        {categorias[key].map((subItem) => (
+                            <Form.Check
+                                type="checkbox"
+                                label={subItem}
+                                key={subItem}
+                                checked={selectedCategorias.includes(subItem)}
+                                onChange={() => handleCategoriaChange(subItem)}
+                                style={{ marginLeft: '20px' }}  // Agregar margen para diferenciar visualmente
+                            />
+                        ))}
+                    </Dropdown.ItemText>
+                ))}
+            </Dropdown.Menu>
+        </Dropdown>
+    );
 
     const handleFileUpload = async (file) => {
         const fileId = Date.now().toString();
@@ -198,7 +189,7 @@ function NewProject() {
                         backgroundColor: "white",
                         borderRadius: "10px",
                         padding: "20px",
-                        width: "95%", 
+                        width: "90%", 
                         maxWidth: "1200px",
                         height: "auto",
                         overflowY: "auto",

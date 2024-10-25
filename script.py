@@ -112,7 +112,7 @@ cap.release()
 # Inicializar el cliente HTTP para inferencias
 CLIENT = InferenceHTTPClient(
     api_url="https://detect.roboflow.com",
-    api_key="FCbLovxwSDWFYTwaMuQi"
+    api_key="bUyMUjRY0TGSKrbNpksy"
 )
 
 # Directorio de imágenes de entrada
@@ -2547,9 +2547,16 @@ task_ref.update({
 })
 
 print(f"URL del PDF guardada en Firestore: {pdf_url}")
-print("Estoy en Script")
+
 
 # Generar y guardar el PDF
 #pdf.output(f"public/informe.pdf")
-shutil.rmtree('capturas')
-shutil.rmtree('output_evaluated_images')
+#shutil.rmtree('capturas')
+#shutil.rmtree('output_evaluated_images')
+#shutil.rmtree('capturas_navegacion')
+#shutil.rmtree('capturasSelenium')
+#shutil.rmtree('fotosSelenium')
+#shutil.rmtree('output_cingoz')
+#shutil.rmtree('output_icon')
+#shutil.rmtree('output_pb')
+#shutil.rmtree('output_images')
