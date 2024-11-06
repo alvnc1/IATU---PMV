@@ -54,6 +54,26 @@
   border-radius: 50%;
 }
 
+.video-button {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  margin-right: 5px;
+  cursor: pointer;
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  transition: background-color 0.3s ease;
+}
+
+.video-button:hover {
+  background-color: transparent;
+  border-radius: 50%;
+}
+
 .delete-button {
   background-color: transparent;
   border: none;
@@ -162,5 +182,3 @@
   display: flex;
   gap: 10px;
 }
-
-

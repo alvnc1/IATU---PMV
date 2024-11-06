@@ -4,7 +4,7 @@ import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
-import { MdDelete, MdPlayArrow, MdAdd, MdVideoLibrary } from "react-icons/md";
+import { MdDelete, MdPlayArrow, MdAdd, MdVideocam  } from "react-icons/md";
 import { collection, getDocs, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from "./firebase";
 import { useNavigate } from 'react-router-dom';
@@ -204,13 +204,13 @@ function ProjectPage() {
                   </td>
                   <td>
                     <div className="action-buttons">
-                      <Button variant="success" onClick={() => handlePlayTask(task)} className="play-button">
+                      <Button variant="success" onClick={() => handlePlayTask(task)} className="play-button" title="Ejecutar">
                         <MdPlayArrow size={20} />
                       </Button>
-                      <Button variant="success" onClick={() => handleShowVideoModal(task)} className="play-button">
-                        <MdVideoLibrary size={20} />
+                      <Button variant="success" onClick={() => handleShowVideoModal(task)} className="video-button"  title="Ver video">
+                        <MdVideocam size={20} />
                       </Button>
-                      <Button variant="danger" onClick={() => deleteTask(task.id)} className="delete-button">
+                      <Button variant="danger" onClick={() => deleteTask(task.id)} className="delete-button"  title="Eliminar tarea">
                         <MdDelete size={20} />
                       </Button>
                     </div>
