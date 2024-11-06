@@ -6,7 +6,7 @@ import Col from "react-bootstrap/Col";
 import Dropdown from 'react-bootstrap/Dropdown';
 import Modal from 'react-bootstrap/Modal';
 import Button from 'react-bootstrap/Button';
-import { MdDelete, MdAccessTime, MdMoreVert, MdShare, MdPeople, MdAccountCircle  } from "react-icons/md"; 
+import { MdDelete, MdAccessTime, MdMoreVert, MdShare, MdPeople, MdAccountCircle } from "react-icons/md"; 
 import { collection, getDocs, deleteDoc, doc, query, where, or, updateDoc, arrayUnion } from 'firebase/firestore';
 import { db } from "./firebase";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
@@ -20,6 +20,7 @@ function MyProjects() {
   const [loading, setLoading] = useState(true);
   const [showShareModal, setShowShareModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false); // Estado para el modal de confirmación de eliminación
   const [usersWithAccess, setUsersWithAccess] = useState([]);
   const [usersWithoutAccess, setUsersWithoutAccess] = useState([]);
   const [hoveredUser, setHoveredUser] = useState(null);
@@ -68,44 +69,45 @@ function MyProjects() {
     }
   };
 
-  const deleteProject = async (projectId) => {
+  const handleDeleteProject = (projectId) => {
+    setSelectedProject(projectId);
+    setShowDeleteModal(true); // Mostrar modal de confirmación de eliminación
+  };
+
+  const confirmDeleteProject = async () => {
     try {
-      await deleteDoc(doc(db, 'proyectos', projectId));
+      await deleteDoc(doc(db, 'proyectos', selectedProject));
       const user = auth.currentUser;
       if (user) {
         getProjects(user.uid);
       }
-      alert('Proyecto eliminado correctamente');
     } catch (error) {
       console.error('Error al eliminar el proyecto: ', error);
       alert('Hubo un error al eliminar el proyecto');
     }
+    setShowDeleteModal(false); // Ocultar el modal después de la eliminación
+    setSelectedProject(null); // Limpiar el proyecto seleccionado
   };
 
   const handleShareProject = (project) => {
-  setSelectedProject(project);
+    setSelectedProject(project);
 
-  // Incluir el propietario del proyecto en la lista de usuarios con acceso
-  const owner = users.find(user => user.id === project.userId);
-  const withAccess = users.filter(user => project.sharedWith?.includes(user.id));
+    const owner = users.find(user => user.id === project.userId);
+    const withAccess = users.filter(user => project.sharedWith?.includes(user.id));
 
-  // Asegurarse de que el propietario esté en la lista
-  if (owner && !withAccess.some(user => user.id === owner.id)) {
-    withAccess.unshift(owner);
-  }
+    if (owner && !withAccess.some(user => user.id === owner.id)) {
+      withAccess.unshift(owner);
+    }
 
-  // Filtrar los usuarios sin acceso (excluyendo al propietario del proyecto y a los que ya están en 'sharedWith')
-  const withoutAccess = users.filter(
-    user => !project.sharedWith?.includes(user.id) && user.id !== project.userId
-  );
+    const withoutAccess = users.filter(
+      user => !project.sharedWith?.includes(user.id) && user.id !== project.userId
+    );
 
-  setUsersWithAccess(withAccess);
-  setUsersWithoutAccess(withoutAccess);
+    setUsersWithAccess(withAccess);
+    setUsersWithoutAccess(withoutAccess);
 
-  setShowShareModal(true);
-};
-  
-  
+    setShowShareModal(true);
+  };
 
   const shareProjectWithUser = async (userId) => {
     try {
@@ -130,38 +132,6 @@ function MyProjects() {
       alert('Hubo un error al compartir el proyecto');
     }
   };
-
-  const revokeAccess = async (userId) => {
-    try {
-      if (!selectedProject) return;
-  
-      const projectRef = doc(db, 'proyectos', selectedProject.id);
-  
-      // Actualizar el documento para eliminar el usuario de 'sharedWith'
-      await updateDoc(projectRef, {
-        sharedWith: selectedProject.sharedWith.filter(id => id !== userId)
-      });
-  
-      console.log(`Acceso revocado al usuario ID: ${userId} para el proyecto ${selectedProject.nombreProyecto}`);
-  
-      // Actualizar la lista de usuarios con acceso y sin acceso en el estado local
-      setUsersWithAccess(usersWithAccess.filter(user => user.id !== userId));
-      const userRevoked = usersWithAccess.find(user => user.id === userId);
-      if (userRevoked) {
-        setUsersWithoutAccess([...usersWithoutAccess, userRevoked]);
-      }
-  
-      // Recargar la lista de proyectos para reflejar el cambio
-      const user = auth.currentUser;
-      if (user) {
-        await getProjects(user.uid);
-      }
-    } catch (error) {
-      console.error('Error al revocar acceso: ', error);
-      alert('Hubo un error al revocar el acceso');
-    }
-  };
-  
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -211,7 +181,7 @@ function MyProjects() {
                             <MdShare style={{ marginRight: '5px' }} />
                             Compartir
                           </Dropdown.Item>
-                          <Dropdown.Item onClick={() => deleteProject(project.id)}>
+                          <Dropdown.Item onClick={() => handleDeleteProject(project.id)}>
                             <MdDelete style={{ marginRight: '5px' }} />
                             Eliminar
                           </Dropdown.Item>
@@ -240,6 +210,23 @@ function MyProjects() {
         </Container>
       </div>
 
+      {/* Modal de Confirmación de Eliminación */}
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmación de Eliminación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer.</Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteProject}>
+            Eliminar
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal de Compartir Proyecto */}
       <Modal show={showShareModal} onHide={() => setShowShareModal(false)} className="share-modal">
         <Modal.Header closeButton>
           <Modal.Title>Comparte tu proyecto con otros</Modal.Title>
@@ -254,40 +241,10 @@ function MyProjects() {
                     <MdAccountCircle size={20} style={{ marginRight: '8px', color: '#555' }} />
                     <span className="user-email">{user.email}</span>
                   </div>
-                  <Button
-                    className={`status-btn access ${hoveredUser === user.id ? "share" : ""}`}
-                    onMouseEnter={() => setHoveredUser(user.id)}
-                    onMouseLeave={() => setHoveredUser(null)}
-                    onClick={() => revokeAccess(user.id)}
-                  >
-                    {hoveredUser === user.id ? "Quitar acceso" : "Ya tiene acceso"}
-                  </Button>
-
                 </div>
               ))
             ) : (
               <p>No hay usuarios con acceso.</p>
-            )}
-          </div>
-          <h5>Usuarios sin acceso:</h5>
-          <div className="user-list">
-            {usersWithoutAccess.length > 0 ? (
-              usersWithoutAccess.map((user) => (
-                <div className="user-item" key={user.id}>
-                  <div className="d-flex align-items-center">
-                    <MdAccountCircle size={20} style={{ marginRight: '8px', color: '#555' }} />
-                    <span className="user-email">{user.email}</span>
-                  </div>
-                  <Button
-                    className="status-btn share"
-                    onClick={() => shareProjectWithUser(user.id)}
-                  >
-                    Compartir
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <p>No hay usuarios sin acceso.</p>
             )}
           </div>
         </Modal.Body>

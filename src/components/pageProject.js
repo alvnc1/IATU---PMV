@@ -4,7 +4,7 @@ import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
-import { MdDelete, MdPlayArrow, MdAdd, MdVideocam  } from "react-icons/md";
+import { MdDelete, MdPlayArrow, MdAdd, MdVideocam } from "react-icons/md";
 import { collection, getDocs, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from "./firebase";
 import { useNavigate } from 'react-router-dom';
@@ -18,6 +18,8 @@ function ProjectPage() {
   const [showModal, setShowModal] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
   const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false); // Estado para el modal de confirmación de eliminación
+  const [taskToDelete, setTaskToDelete] = useState(null); // Estado para la tarea a eliminar
   const [sortOrder, setSortOrder] = useState('asc');
   const [testStatus, setTestStatus] = useState({});
   const [projectName, setProjectName] = useState(''); 
@@ -59,15 +61,21 @@ function ProjectPage() {
     setTestStatus(updatedStatus);
   };
 
-  const deleteTask = async (taskId) => {
+  const handleDeleteTask = (taskId) => {
+    setTaskToDelete(taskId); // Establece la tarea a eliminar
+    setShowDeleteModal(true); // Muestra el modal de confirmación
+  };
+
+  const confirmDeleteTask = async () => {
     try {
-      await deleteDoc(doc(db, 'proyectos', id, 'tasks', taskId));
+      await deleteDoc(doc(db, 'proyectos', id, 'tasks', taskToDelete));
       getTasks();
-      alert('Tarea eliminada correctamente');
     } catch (error) {
       console.error('Error al eliminar la tarea: ', error);
       alert('Hubo un error al eliminar la tarea');
     }
+    setShowDeleteModal(false); // Cierra el modal después de la eliminación
+    setTaskToDelete(null); // Resetea el estado de la tarea a eliminar
   };
 
   const handleShowModal = (task) => {
@@ -116,7 +124,6 @@ function ProjectPage() {
     })
     .then(response => response.json())
     .then(() => {
-      // Obtener tareas actualizadas después de que el script haya terminado de ejecutarse
       getTasks();
     })
     .catch(error => {
@@ -207,10 +214,10 @@ function ProjectPage() {
                       <Button variant="success" onClick={() => handlePlayTask(task)} className="play-button" title="Ejecutar">
                         <MdPlayArrow size={20} />
                       </Button>
-                      <Button variant="success" onClick={() => handleShowVideoModal(task)} className="video-button"  title="Ver video">
+                      <Button variant="success" onClick={() => handleShowVideoModal(task)} className="video-button" title="Ver video">
                         <MdVideocam size={20} />
                       </Button>
-                      <Button variant="danger" onClick={() => deleteTask(task.id)} className="delete-button"  title="Eliminar tarea">
+                      <Button variant="danger" onClick={() => handleDeleteTask(task.id)} className="delete-button" title="Eliminar tarea">
                         <MdDelete size={20} />
                       </Button>
                     </div>
@@ -264,6 +271,24 @@ function ProjectPage() {
             <p>No se encontró la URL del video.</p>
           )}
         </Modal.Body>
+      </Modal>
+
+      {/* Modal de confirmación para eliminar tarea */}
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmar Eliminación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          ¿Estás seguro de que deseas eliminar esta tarea?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteTask}>
+            Eliminar
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );
