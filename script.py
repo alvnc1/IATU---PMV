@@ -2515,7 +2515,7 @@ driver.quit()
 
 
 # Inicializa Firebase
-cred = credentials.Certificate('src\components\config\iatu-pmv-firebase-adminsdk-my9kl-8e5b47f816.json')
+cred = credentials.Certificate('src\components\config\iatu-pmv-firebase-adminsdk-my9kl-4321b8a185.json')
 initialize_app(cred, {'storageBucket': 'iatu-pmv.appspot.com'})
 
 # Usar BytesIO para guardar el PDF en memoria
@@ -2551,8 +2551,8 @@ print(f"URL del PDF guardada en Firestore: {pdf_url}")
 
 # Generar y guardar el PDF
 #pdf.output(f"public/informe.pdf")
-#shutil.rmtree('capturas')
-#shutil.rmtree('output_evaluated_images')
+shutil.rmtree('capturas')
+shutil.rmtree('output_evaluated_images')
 #shutil.rmtree('capturas_navegacion')
 #shutil.rmtree('capturasSelenium')
 #shutil.rmtree('fotosSelenium')

@@ -262,7 +262,7 @@ def cingozDetect(image_dir, output_dir, model_id, excluded_class, similarity_thr
                     saved_images_by_class[class_name].append(cropped_image)
     print(f"Se encontraron {c} imagenes similares")
     print("Proceso de detección de bounding boxes completado.")
-  
+
 def appIconDetect(image_dir, output_dir, model_id):
     """
     Detecta todas las clases en las imágenes de un directorio, crea un directorio por clase y guarda las imágenes con
@@ -317,27 +317,26 @@ def appIconDetect(image_dir, output_dir, model_id):
 
     print("Proceso de detección y guardado de bounding boxes por clase completado.")
 
-#Parámetros del modelo y la clase a detectar
-model_id = "app-icon/45"  # Reemplaza con el ID de tu modelo de Roboflow
-
-#Directorios de entrada y salida
-video_path = "capturas"  # Reemplaza con la ruta de tu video
-output_dir = "output_icon"
-image_dir = "capturas"
-os.makedirs(output_dir, exist_ok=True)
-appIconDetect(image_dir, output_dir, model_id)
 model_id = "progressbar-iptbc/6"  # Reemplaza con el ID de tu modelo de Roboflow
 class_of_interest = "ProgressBar"  # Clase que deseas detectar
 
+
+image_dir = "capturas"  # Reemplaza con la ruta de tu video
 output_dir = "output_pb"
 os.makedirs(output_dir, exist_ok=True)
 progressBar_flag = progressBarDetect(image_dir, output_dir, model_id, class_of_interest)
+if progressBar_flag:
+    print("ProgressBar detectado en el video.")
+else:
+    print("ProgressBar no detectado en el video.")
+
 
 
 model_id = "cingoz8/1"  # Reemplaza con el ID de tu modelo de Roboflow
 excluded_class = "icon"  # Clase que deseas detectar
 
 
+image_dir = "capturas"  # Reemplaza con la ruta de tu video
 output_dir = "output_cingoz"
 os.makedirs(output_dir, exist_ok=True)
 cingozDetect(image_dir, output_dir, model_id, excluded_class)
@@ -409,12 +408,12 @@ pdf.set_xy((page_width - fecha_width) / 2, 100)  # Ajustar `y=100` para la fecha
 pdf.cell(fecha_width, 10, txt=fecha_text, ln=True)
 
 # Iniciar una página antes del loop
-pdf.add_page()
+#pdf.add_page()
 
 # Agregar el título en la primera página
-pdf.set_font('Arial', 'B', 14)  # Configurar la fuente: Arial, Negrita, tamaño 16
-pdf.cell(200, 10, "Capturas de Frames y Detección de Componentes", ln=True, align='C')  # Centrar el título
-pdf.ln(20)  # Añadir espacio después del título
+#pdf.set_font('Arial', 'B', 14)  # Configurar la fuente: Arial, Negrita, tamaño 16
+#pdf.cell(200, 10, "Capturas de Frames y Detección de Componentes", ln=True, align='C')  # Centrar el título
+#pdf.ln(20)  # Añadir espacio después del título
 
 # Variables de posición para el layout de las imágenes
 x_pos = 10  # Posición horizontal inicial
@@ -426,54 +425,54 @@ page_height = 297  # Altura de la página A4 en mm
 margin_bottom = 10  # Margen inferior de la página
 
 # Procesar cada imagen
-for idx, image_filename in enumerate(os.listdir(input_dir)):
-    if image_filename.endswith(('.jpg', '.jpeg', '.png')):
-        image_path = os.path.join(input_dir, image_filename)
+# for idx, image_filename in enumerate(os.listdir(input_dir)):
+#     if image_filename.endswith(('.jpg', '.jpeg', '.png')):
+#         image_path = os.path.join(input_dir, image_filename)
 
-        # Realizar la inferencia con los modelos
-        result = CLIENT.infer(image_path, model_id="cingoz8/1")
-        result_model_2 = CLIENT.infer(image_path, model_id="app-icon/45")
+#         # Realizar la inferencia con los modelos
+#         result = CLIENT.infer(image_path, model_id="cingoz8/1")
+#         result_model_2 = CLIENT.infer(image_path, model_id="app-icon/48")
 
-        # Combinar los resultados de ambos modelos
-        combined_results = result['predictions'] + result_model_2['predictions']
+#         # Combinar los resultados de ambos modelos
+#         combined_results = result['predictions'] + result_model_2['predictions']
 
-        # Crear subdirectorio para la imagen
-        image_output_dir = os.path.join(output_base_dir, os.path.splitext(image_filename)[0])
-        os.makedirs(image_output_dir, exist_ok=True)
+#         # Crear subdirectorio para la imagen
+#         image_output_dir = os.path.join(output_base_dir, os.path.splitext(image_filename)[0])
+#         os.makedirs(image_output_dir, exist_ok=True)
 
-        # Cargar la imagen original
-        image = cv2.imread(image_path)
-        original_height, original_width, _ = image.shape
+#         # Cargar la imagen original
+#         image = cv2.imread(image_path)
+#         original_height, original_width, _ = image.shape
 
-        # Procesar los resultados y dibujar bounding boxes en la imagen original
-        for i, prediction in enumerate(combined_results):
-            # Coordenadas de la bounding box
-            x0 = int(prediction['x'] - prediction['width'] / 2)
-            y0 = int(prediction['y'] - prediction['height'] / 2)
-            x1 = int(prediction['x'] + prediction['width'] / 2)
-            y1 = int(prediction['y'] + prediction['height'] / 2)
+#         # Procesar los resultados y dibujar bounding boxes en la imagen original
+#         for i, prediction in enumerate(combined_results):
+#             # Coordenadas de la bounding box
+#             x0 = int(prediction['x'] - prediction['width'] / 2)
+#             y0 = int(prediction['y'] - prediction['height'] / 2)
+#             x1 = int(prediction['x'] + prediction['width'] / 2)
+#             y1 = int(prediction['y'] + prediction['height'] / 2)
 
-            # Dibujar la bounding box en la imagen original
-            cv2.rectangle(image, (x0, y0), (x1, y1), color=(0, 255, 0), thickness=2)
+#             # Dibujar la bounding box en la imagen original
+#             cv2.rectangle(image, (x0, y0), (x1, y1), color=(0, 255, 0), thickness=2)
 
-            # Poner el label (clase y confianza) encima de la bounding box
-            label = f"{prediction['class']} ({prediction['confidence']:.2f})"
-            cv2.putText(image, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+#             # Poner el label (clase y confianza) encima de la bounding box
+#             label = f"{prediction['class']} ({prediction['confidence']:.2f})"
+#             cv2.putText(image, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # Guardar la imagen original con todas las bounding boxes dibujadas
-        output_image_path = os.path.join(image_output_dir, os.path.basename(image_path))
-        cv2.imwrite(output_image_path, image)
+#         # Guardar la imagen original con todas las bounding boxes dibujadas
+#         output_image_path = os.path.join(image_output_dir, os.path.basename(image_path))
+#         cv2.imwrite(output_image_path, image)
 
-        # Verificar si hay suficiente espacio para la imagen actual
-        if y_pos + image_height + margin_bottom > page_height:
-            pdf.add_page()  # Añadir nueva página
-            y_pos = 10  # Resetear la posición vertical para la nueva página
+#         # Verificar si hay suficiente espacio para la imagen actual
+#         if y_pos + image_height + margin_bottom > page_height:
+#             pdf.add_page()  # Añadir nueva página
+#             y_pos = 10  # Resetear la posición vertical para la nueva página
 
-        # Colocar la imagen en la posición calculada
-        pdf.image(output_image_path, x=x_pos, y=y_pos, w=image_width, h=image_height)
+#         # Colocar la imagen en la posición calculada
+#         pdf.image(output_image_path, x=x_pos, y=y_pos, w=image_width, h=image_height)
 
-        # Ajustar la posición vertical para la siguiente imagen
-        y_pos += image_height + space_between_images
+#         # Ajustar la posición vertical para la siguiente imagen
+#         y_pos += image_height + space_between_images
 
 # Agrega una página
 pdf.add_page()
@@ -525,12 +524,12 @@ pdf.set_xy((page_width - fecha_width) / 2, 100)  # Ajustar `y=100` para la fecha
 pdf.cell(fecha_width, 10, txt=fecha_text, ln=True)
 
 # Iniciar una página antes del loop
-pdf.add_page()
+#pdf.add_page()
 
 # Agregar el título en la primera página
-pdf.set_font('Arial', 'B', 14)  # Configurar la fuente: Arial, Negrita, tamaño 16
-pdf.cell(200, 10, "Capturas de Frames y Detección de Componentes", ln=True, align='C')  # Centrar el título
-pdf.ln(20)  # Añadir espacio después del título
+#pdf.set_font('Arial', 'B', 14)  # Configurar la fuente: Arial, Negrita, tamaño 16
+#pdf.cell(200, 10, "Capturas de Frames y Detección de Componentes", ln=True, align='C')  # Centrar el título
+#pdf.ln(20)  # Añadir espacio después del título
 
 # Variables de posición para el layout de las imágenes
 x_pos = 10  # Posición horizontal inicial
@@ -542,54 +541,54 @@ page_height = 297  # Altura de la página A4 en mm
 margin_bottom = 10  # Margen inferior de la página
 
 # Procesar cada imagen
-for idx, image_filename in enumerate(os.listdir(input_dir)):
-    if image_filename.endswith(('.jpg', '.jpeg', '.png')):
-        image_path = os.path.join(input_dir, image_filename)
+# for idx, image_filename in enumerate(os.listdir(input_dir)):
+#     if image_filename.endswith(('.jpg', '.jpeg', '.png')):
+#         image_path = os.path.join(input_dir, image_filename)
 
-        # Realizar la inferencia con los modelos
-        result = CLIENT.infer(image_path, model_id="cingoz8/1")
-        result_model_2 = CLIENT.infer(image_path, model_id="app-icon/45")
+#         # Realizar la inferencia con los modelos
+#         result = CLIENT.infer(image_path, model_id="cingoz8/1")
+#         result_model_2 = CLIENT.infer(image_path, model_id="app-icon/48")
 
-        # Combinar los resultados de ambos modelos
-        combined_results = result['predictions'] + result_model_2['predictions']
+#         # Combinar los resultados de ambos modelos
+#         combined_results = result['predictions'] + result_model_2['predictions']
 
-        # Crear subdirectorio para la imagen
-        image_output_dir = os.path.join(output_base_dir, os.path.splitext(image_filename)[0])
-        os.makedirs(image_output_dir, exist_ok=True)
+#         # Crear subdirectorio para la imagen
+#         image_output_dir = os.path.join(output_base_dir, os.path.splitext(image_filename)[0])
+#         os.makedirs(image_output_dir, exist_ok=True)
 
-        # Cargar la imagen original
-        image = cv2.imread(image_path)
-        original_height, original_width, _ = image.shape
+#         # Cargar la imagen original
+#         image = cv2.imread(image_path)
+#         original_height, original_width, _ = image.shape
 
-        # Procesar los resultados y dibujar bounding boxes en la imagen original
-        for i, prediction in enumerate(combined_results):
-            # Coordenadas de la bounding box
-            x0 = int(prediction['x'] - prediction['width'] / 2)
-            y0 = int(prediction['y'] - prediction['height'] / 2)
-            x1 = int(prediction['x'] + prediction['width'] / 2)
-            y1 = int(prediction['y'] + prediction['height'] / 2)
+#         # Procesar los resultados y dibujar bounding boxes en la imagen original
+#         for i, prediction in enumerate(combined_results):
+#             # Coordenadas de la bounding box
+#             x0 = int(prediction['x'] - prediction['width'] / 2)
+#             y0 = int(prediction['y'] - prediction['height'] / 2)
+#             x1 = int(prediction['x'] + prediction['width'] / 2)
+#             y1 = int(prediction['y'] + prediction['height'] / 2)
 
-            # Dibujar la bounding box en la imagen original
-            cv2.rectangle(image, (x0, y0), (x1, y1), color=(0, 255, 0), thickness=2)
+#             # Dibujar la bounding box en la imagen original
+#             cv2.rectangle(image, (x0, y0), (x1, y1), color=(0, 255, 0), thickness=2)
 
-            # Poner el label (clase y confianza) encima de la bounding box
-            label = f"{prediction['class']} ({prediction['confidence']:.2f})"
-            cv2.putText(image, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+#             # Poner el label (clase y confianza) encima de la bounding box
+#             label = f"{prediction['class']} ({prediction['confidence']:.2f})"
+#             cv2.putText(image, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # Guardar la imagen original con todas las bounding boxes dibujadas
-        output_image_path = os.path.join(image_output_dir, os.path.basename(image_path))
-        cv2.imwrite(output_image_path, image)
+#         # Guardar la imagen original con todas las bounding boxes dibujadas
+#         output_image_path = os.path.join(image_output_dir, os.path.basename(image_path))
+#         cv2.imwrite(output_image_path, image)
 
-        # Verificar si hay suficiente espacio para la imagen actual
-        if y_pos + image_height + margin_bottom > page_height:
-            pdf.add_page()  # Añadir nueva página
-            y_pos = 10  # Resetear la posición vertical para la nueva página
+#         # Verificar si hay suficiente espacio para la imagen actual
+#         if y_pos + image_height + margin_bottom > page_height:
+#             pdf.add_page()  # Añadir nueva página
+#             y_pos = 10  # Resetear la posición vertical para la nueva página
 
-        # Colocar la imagen en la posición calculada
-        pdf.image(output_image_path, x=x_pos, y=y_pos, w=image_width, h=image_height)
+#         # Colocar la imagen en la posición calculada
+#         pdf.image(output_image_path, x=x_pos, y=y_pos, w=image_width, h=image_height)
 
-        # Ajustar la posición vertical para la siguiente imagen
-        y_pos += image_height + space_between_images
+#         # Ajustar la posición vertical para la siguiente imagen
+#         y_pos += image_height + space_between_images
 
 # Agrega una página
 pdf.add_page()
@@ -1732,7 +1731,7 @@ for i, image_file in enumerate(progressbar_images, 1):
 
 
 # Inicializa Firebase
-cred = credentials.Certificate('src\components\config\iatu-pmv-firebase-adminsdk-my9kl-8e5b47f816.json')
+cred = credentials.Certificate('src\components\config\iatu-pmv-firebase-adminsdk-my9kl-4321b8a185.json')
 initialize_app(cred, {'storageBucket': 'iatu-pmv.appspot.com'})
 
 # Usar BytesIO para guardar el PDF en memoria
@@ -1766,12 +1765,12 @@ task_ref.update({
 print(f"URL del PDF guardada en Firestore: {pdf_url}")
 
 
-shutil.rmtree('capturas')
-shutil.rmtree('output_evaluated_images')
-shutil.rmtree('capturas_navegacion')
-shutil.rmtree('capturasSelenium')
-shutil.rmtree('fotosSelenium')
-shutil.rmtree('output_cingoz')
-shutil.rmtree('output_icon')
-shutil.rmtree('output_pb')
-shutil.rmtree('output_images')
+# shutil.rmtree('capturas')
+# shutil.rmtree('output_evaluated_images')
+# shutil.rmtree('capturas_navegacion')
+# shutil.rmtree('capturasSelenium')
+# shutil.rmtree('fotosSelenium')
+# shutil.rmtree('output_cingoz')
+# shutil.rmtree('output_icon')
+# shutil.rmtree('output_pb')
+# shutil.rmtree('output_images')

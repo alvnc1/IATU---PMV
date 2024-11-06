@@ -22,7 +22,7 @@ app.post('/run-python', (req, res) => {
     console.log(`Datos recibidos - videoUrl: ${videoUrl}, urlTarea: ${urlTarea}, categorias: ${categorias}, id:${idT}, id Proyecto: ${idP}`);
 
     // Ejecutar el proceso de Python
-    const pythonProcess = spawn('python', ['script.py', videoUrl,urlTarea,categorias,idT,idP]);
+    const pythonProcess = spawn('python', ['checkAdulto.py', videoUrl,urlTarea,categorias,idT,idP]);
     
 
     pythonProcess.stdout.on('data', (data) => {
