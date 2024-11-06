@@ -19,6 +19,7 @@ function NewTask() {
     const [files, setFiles] = useState([]);
     const [uploadStatus, setUploadStatus] = useState({});
     const navigate = useNavigate();
+    const [openCategory, setOpenCategory] = useState(null); // Controlar qué categoría principal está expandida
 
     const categorias = {
         Usabilidad: [
@@ -61,6 +62,10 @@ function NewTask() {
         });
     };
 
+    const toggleCategory = (category) => {
+        setOpenCategory(openCategory === category ? null : category);
+    };
+
     const renderCategoriasMenu = () => (
         <Dropdown>
             <Dropdown.Toggle variant="outline-secondary" id="dropdown-basic">
@@ -68,19 +73,24 @@ function NewTask() {
             </Dropdown.Toggle>
             <Dropdown.Menu>
                 {Object.keys(categorias).map((key) => (
-                    <Dropdown.ItemText key={key}>
-                        <strong>{key}</strong>
-                        {categorias[key].map((subItem) => (
-                            <Form.Check
-                                type="checkbox"
-                                label={subItem}
-                                key={subItem}
-                                checked={selectedCategorias.includes(subItem)}
-                                onChange={() => handleCategoriaChange(subItem)}
-                                style={{ marginLeft: '20px' }}  // Agregar margen para diferenciar visualmente
-                            />
-                        ))}
-                    </Dropdown.ItemText>
+                    <div key={key}>
+                        <Dropdown.ItemText onClick={() => toggleCategory(key)} style={{ cursor: "pointer" }}>
+                            {key}
+                        </Dropdown.ItemText>
+                        {openCategory === key && (
+                            <div style={{ marginLeft: '20px' }}>
+                                {categorias[key].map((subItem) => (
+                                    <Form.Check
+                                        type="checkbox"
+                                        label={subItem}
+                                        key={subItem}
+                                        checked={selectedCategorias.includes(subItem)}
+                                        onChange={() => handleCategoriaChange(subItem)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 ))}
             </Dropdown.Menu>
         </Dropdown>
