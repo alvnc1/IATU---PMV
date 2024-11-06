@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Nav } from 'react-bootstrap';
+import { Nav, Modal, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { MdAddBox, MdAccountCircle, MdApps } from "react-icons/md";
 import { auth, db } from "./firebase";
@@ -10,6 +10,7 @@ import logo from './images/logo_white.png';
 
 function Sidebar() {
   const [userDetails, setUserDetails] = useState(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false); // Estado para controlar la visibilidad del modal
 
   const fetchUserData = async () => {
     auth.onAuthStateChanged(async (user) => {
@@ -31,7 +32,7 @@ function Sidebar() {
     fetchUserData();
   }, []);
 
-  async function handleLogout() {
+  const handleLogout = async () => {
     try {
       await auth.signOut();
       window.location.href = "/login";
@@ -39,7 +40,11 @@ function Sidebar() {
     } catch (error) {
       console.error("Error logging out:", error.message);
     }
-  }
+  };
+
+  // Funciones para controlar el modal de cierre de sesión
+  const openLogoutModal = () => setShowLogoutModal(true);
+  const closeLogoutModal = () => setShowLogoutModal(false);
 
   return (
     <div className="sidebar">
@@ -66,12 +71,28 @@ function Sidebar() {
             </Link>
           </Nav.Item>
           <Nav.Item>
-            <div className="nav-link" onClick={handleLogout} style={{ cursor: 'pointer' }}>
+            <div className="nav-link" onClick={openLogoutModal} style={{ cursor: 'pointer' }}>
               <MdAccountCircle className="sidebar-icon" /> {userDetails ? `${userDetails.firstName} ${userDetails.lastName}` : 'Mi Cuenta'}
             </div>
           </Nav.Item>
         </Nav>
       </div>
+
+      {/* Modal de confirmación de cierre de sesión */}
+      <Modal show={showLogoutModal} onHide={closeLogoutModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmar cierre de sesión</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>¿Estás seguro de que quieres cerrar sesión?</Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={closeLogoutModal}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleLogout}>
+            Cerrar sesión
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }
