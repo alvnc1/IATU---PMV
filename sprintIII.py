@@ -9,23 +9,19 @@ import os
 from textstat import textstat
 from PIL import Image, ImageStat
 import spacy
-
-# Configurar Selenium con Chrome en modo headless
-chrome_options = Options()
-chrome_options.add_argument("--headless=old")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-
-# Cargar el modelo de SpaCy
-nlp = spacy.load("en_core_web_md")
-
-
-
-
+import shutil
 
 
 def hdu_tres(url):
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=old")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    # Cargar el modelo de SpaCy
+    nlp = spacy.load("en_core_web_md")
+
     driver.get(url)
     # Configurar directorios
     capturas_dir = "capturas_selenium"
@@ -120,7 +116,113 @@ def hdu_tres(url):
     output_filename = "reporte_legibilidad_ui.pdf"
     pdf.output(output_filename)
 
+def verificar_autenticacion_facil(url):
+    # Configurar Selenium con Chrome en modo headless
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=old")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    # Configurar directorios
+    capturas_dir = "capturas_selenium"
+    auth_dir = os.path.join(capturas_dir, "authentication")
+    os.makedirs(auth_dir, exist_ok=True)
+
+    # Inicializar el PDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Verificación de Métodos de Autenticación en la UI", ln=True, align='C')
+
+    # Navegar a la URL
+    driver.get(url)
+
+    # Verificar si existen métodos de autenticación que no dependan únicamente de pruebas cognitivas
+    autenticacion_alternativa_encontrada = False
+
+    # Buscar formularios de autenticación
+    forms = driver.find_elements(By.TAG_NAME, 'form')
+    for form_index, form in enumerate(forms, start=1):
+        # Verificar si el formulario parece ser de autenticación (verificar campos relacionados con usuario/contraseña)
+        input_elements = form.find_elements(By.TAG_NAME, 'input')
+        campos_usuario = [elem for elem in input_elements if 'user' in elem.get_attribute('name').lower() or 'email' in elem.get_attribute('name').lower()]
+        campos_contraseña = [elem for elem in input_elements if 'pass' in elem.get_attribute('name').lower()]
+
+        if campos_usuario and campos_contraseña:
+            # Encontró un formulario de autenticación
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(200, 10, txt=f"- Formulario de autenticación común encontrado (Formulario #{form_index}).")
+            
+            # Verificar si hay métodos alternativos (ej.: opciones biométricas, enlace mágico, etc.)
+            botones = form.find_elements(By.TAG_NAME, 'button')
+            botones_texto = [boton.text.lower() for boton in botones]
+            alternativas = ['biométrico', 'huella', 'reconocimiento facial', 'pin', 'enlace mágico', 'sin contraseña']
+
+            autenticacion_alternativas = []
+
+            for alternativa in alternativas:
+                if any(alternativa in texto for texto in botones_texto):
+                    autenticacion_alternativa_encontrada = True
+                    autenticacion_alternativas.append(alternativa)
+                    pdf.set_font("Arial", size=8)
+                    pdf.set_x(15)
+                    pdf.multi_cell(200, 10, txt=f"  - Método de autenticación alternativa encontrado: {alternativa.capitalize()}")
+
+            # Verificar si el formulario tiene captcha complejo (indicador de autenticación difícil)
+            if any('captcha' in elem.get_attribute('class').lower() for elem in form.find_elements(By.XPATH, ".//*[contains(@class, 'captcha')]")):
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200, 10, txt="  - Advertencia: Se encontró un CAPTCHA, podría dificultar la autenticación.")
+
+            # Capturar la imagen del formulario de autenticación
+            form_location = form.location
+            form_size = form.size
+            screenshot_path = os.path.join(auth_dir, "captura_completa.png")
+            driver.save_screenshot(screenshot_path)
+            
+            # Recortar la imagen del formulario
+            with Image.open(screenshot_path) as img:
+                left = form_location['x']
+                top = form_location['y']
+                right = left + form_size['width']
+                bottom = top + form_size['height']
+                region_recortada = img.crop((left, top, right, bottom))
+                captura_form = os.path.join(auth_dir, f"formulario_autenticacion_{form_index}.png")
+                region_recortada.save(captura_form)
+                
+                # Añadir la captura al PDF
+                if form_size['width'] < 800 and form_size['height'] < 600:  # Filtrar solo formularios de tamaño adecuado
+                    pdf.image(captura_form, x=15, y=None, w=0, h=0)
+
+            # Añadir información sobre los métodos de autenticación encontrados al PDF
+            if autenticacion_alternativas:
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(200, 10, txt=f"  - Métodos de autenticación alternativa disponibles: {', '.join(autenticacion_alternativas)}")
+
+    # Si no se encontraron alternativas a pruebas cognitivas difíciles
+    if not autenticacion_alternativa_encontrada:
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(200, 10, txt="- Advertencia: No se encontraron métodos de autenticación alternativos que no dependan de la función cognitiva.")
+
+    # Guardar el PDF con los resultados
+    output_filename = "reporte_autenticacion_ui.pdf"
+    pdf.output(output_filename)
+
+    # Cerrar el navegador
+    driver.quit()
+
+    # Eliminar el directorio de capturas al finalizar
+    if os.path.exists(capturas_dir):
+        shutil.rmtree(capturas_dir)
+
+
+
+
 
 # Navegar a la URL
-url = "https://www.mercadolibre.cl"  # URL de ejemplo
-hdu_tres(url)
+#url = "https://www.mercadolibre.cl"  # URL de ejemplo
+#hdu_tres(url)
