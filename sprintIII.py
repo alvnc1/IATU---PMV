@@ -116,7 +116,8 @@ def hdu_tres(url):
     output_filename = "reporte_legibilidad_ui.pdf"
     pdf.output(output_filename)
 
-def verificar_autenticacion_facil(url):
+
+def verificar_enlaces_coherencia_titulo(url):
     # Configurar Selenium con Chrome en modo headless
     chrome_options = Options()
     chrome_options.add_argument("--headless=old")
@@ -126,91 +127,84 @@ def verificar_autenticacion_facil(url):
 
     # Configurar directorios
     capturas_dir = "capturas_selenium"
-    auth_dir = os.path.join(capturas_dir, "authentication")
-    os.makedirs(auth_dir, exist_ok=True)
+    enlaces_dir = os.path.join(capturas_dir, "enlaces")
+    os.makedirs(enlaces_dir, exist_ok=True)
 
     # Inicializar el PDF
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Verificación de Métodos de Autenticación en la UI", ln=True, align='C')
+    pdf.cell(200, 10, txt="Verificación de Coherencia entre Enlaces y Títulos de Página", ln=True, align='C')
 
     # Navegar a la URL
     driver.get(url)
 
-    # Verificar si existen métodos de autenticación que no dependan únicamente de pruebas cognitivas
-    autenticacion_alternativa_encontrada = False
-
-    # Buscar formularios de autenticación
-    forms = driver.find_elements(By.TAG_NAME, 'form')
-    for form_index, form in enumerate(forms, start=1):
-        # Verificar si el formulario parece ser de autenticación (verificar campos relacionados con usuario/contraseña)
-        input_elements = form.find_elements(By.TAG_NAME, 'input')
-        campos_usuario = [elem for elem in input_elements if 'user' in elem.get_attribute('name').lower() or 'email' in elem.get_attribute('name').lower()]
-        campos_contraseña = [elem for elem in input_elements if 'pass' in elem.get_attribute('name').lower()]
-
-        if campos_usuario and campos_contraseña:
-            # Encontró un formulario de autenticación
-            pdf.set_font("Arial", size=8)
-            pdf.set_x(15)
-            pdf.multi_cell(200, 10, txt=f"- Formulario de autenticación común encontrado (Formulario #{form_index}).")
+    # Buscar todos los enlaces visibles
+    enlaces = driver.find_elements(By.TAG_NAME, 'a')
+    enlaces_coinciden = 0  # Contador de enlaces que coinciden
+    for index, enlace in enumerate(enlaces, start=1):
+        if enlace.is_displayed() and enlace.get_attribute('href'):
+            link_text = enlace.text.strip()
+            link_url = enlace.get_attribute('href')
             
-            # Verificar si hay métodos alternativos (ej.: opciones biométricas, enlace mágico, etc.)
-            botones = form.find_elements(By.TAG_NAME, 'button')
-            botones_texto = [boton.text.lower() for boton in botones]
-            alternativas = ['biométrico', 'huella', 'reconocimiento facial', 'pin', 'enlace mágico', 'sin contraseña']
+            # Abrir el enlace en una nueva pestaña
+            driver.execute_script("window.open(arguments[0], '_blank');", link_url)
+            driver.switch_to.window(driver.window_handles[1])
 
-            autenticacion_alternativas = []
+            # Obtener el título de la página de destino
+            page_title = driver.title.strip()
 
-            for alternativa in alternativas:
-                if any(alternativa in texto for texto in botones_texto):
-                    autenticacion_alternativa_encontrada = True
-                    autenticacion_alternativas.append(alternativa)
-                    pdf.set_font("Arial", size=8)
-                    pdf.set_x(15)
-                    pdf.multi_cell(200, 10, txt=f"  - Método de autenticación alternativa encontrado: {alternativa.capitalize()}")
+            # Verificar si se redirigió a una página de inicio de sesión
+            if "login" in driver.current_url.lower() or "signin" in driver.current_url.lower() or "iniciar sesión" in page_title.lower():
+                print(f"Redirigido a una página de inicio de sesión para el enlace '{link_text}'. Ignorando este enlace.")
+                driver.close()
+                driver.switch_to.window(driver.window_handles[0])
+                continue
 
-            # Verificar si el formulario tiene captcha complejo (indicador de autenticación difícil)
-            if any('captcha' in elem.get_attribute('class').lower() for elem in form.find_elements(By.XPATH, ".//*[contains(@class, 'captcha')]")):
+            # Comparar el texto del enlace con el título de la página
+            safe_link_text = link_text.encode('ascii', 'ignore').decode()
+            safe_page_title = page_title.encode('ascii', 'ignore').decode()
+
+            if safe_link_text.lower() in safe_page_title.lower():
+                enlaces_coinciden += 1
+            else:
                 pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
-                pdf.multi_cell(200, 10, txt="  - Advertencia: Se encontró un CAPTCHA, podría dificultar la autenticación.")
-
-            # Capturar la imagen del formulario de autenticación
-            form_location = form.location
-            form_size = form.size
-            screenshot_path = os.path.join(auth_dir, "captura_completa.png")
-            driver.save_screenshot(screenshot_path)
-            
-            # Recortar la imagen del formulario
-            with Image.open(screenshot_path) as img:
-                left = form_location['x']
-                top = form_location['y']
-                right = left + form_size['width']
-                bottom = top + form_size['height']
-                region_recortada = img.crop((left, top, right, bottom))
-                captura_form = os.path.join(auth_dir, f"formulario_autenticacion_{form_index}.png")
-                region_recortada.save(captura_form)
+                pdf.multi_cell(200, 10, txt=f"- Advertencia: El enlace '{safe_link_text}' NO coincide con el título de la página de destino: '{safe_page_title}'")
                 
-                # Añadir la captura al PDF
-                if form_size['width'] < 800 and form_size['height'] < 600:  # Filtrar solo formularios de tamaño adecuado
-                    pdf.image(captura_form, x=15, y=None, w=0, h=0)
+                # Guardar la captura de pantalla de la página de destino
+                screenshot_path = os.path.join(enlaces_dir, f"enlace_{index}_captura.png")
+                driver.save_screenshot(screenshot_path)
 
-            # Añadir información sobre los métodos de autenticación encontrados al PDF
-            if autenticacion_alternativas:
-                pdf.set_font("Arial", size=8)
-                pdf.set_x(15)
-                pdf.multi_cell(200, 10, txt=f"  - Métodos de autenticación alternativa disponibles: {', '.join(autenticacion_alternativas)}")
+                # Redimensionar la imagen para hacerla 1.5 veces más grande, sin ocupar toda la página
+                with Image.open(screenshot_path) as img:
+                    original_width, original_height = img.size
+                    new_width, new_height = int(original_width * 1.5), int(original_height * 1.5)
+                    
+                    # Asegurar que las dimensiones no excedan el tamaño de la página
+                    max_width, max_height = 150, 150
+                    new_width = min(new_width, max_width)
+                    new_height = min(new_height, max_height)
 
-    # Si no se encontraron alternativas a pruebas cognitivas difíciles
-    if not autenticacion_alternativa_encontrada:
-        pdf.set_font("Arial", size=8)
-        pdf.set_x(15)
-        pdf.multi_cell(200, 10, txt="- Advertencia: No se encontraron métodos de autenticación alternativos que no dependan de la función cognitiva.")
+                    img_resized = img.resize((new_width, new_height))
+                    resized_screenshot_path = os.path.join(enlaces_dir, f"enlace_{index}_captura_resized.png")
+                    img_resized.save(resized_screenshot_path)
+
+                    # Añadir la captura al PDF
+                    pdf.image(resized_screenshot_path, x=15, y=None)
+
+            # Cerrar la pestaña actual y volver a la original
+            driver.close()
+            driver.switch_to.window(driver.window_handles[0])
+
+    # Añadir el resumen de los enlaces que coinciden al PDF
+    pdf.set_font("Arial", size=10)
+    pdf.set_x(15)
+    pdf.multi_cell(200, 10, txt=f"- Número de enlaces que coinciden con el título de la página de destino: {enlaces_coinciden}")
 
     # Guardar el PDF con los resultados
-    output_filename = "reporte_autenticacion_ui.pdf"
-    pdf.output(output_filename)
+    output_filename = "reporte_coherencia_enlaces.pdf"
+    pdf.output(output_filename, dest='F')  # Guardar usando 'utf-8'
 
     # Cerrar el navegador
     driver.quit()
@@ -219,10 +213,58 @@ def verificar_autenticacion_facil(url):
     if os.path.exists(capturas_dir):
         shutil.rmtree(capturas_dir)
 
+def verificar_enlaces_genericos(url):
+    # Configurar Selenium con Chrome en modo headless
+    chrome_options = Options()
+    chrome_options.add_argument("--headless=old")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    # Inicializar el PDF
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="Verificación de Enlaces con Texto Genérico", ln=True, align='C')
+
+    # Navegar a la URL
+    driver.get(url)
+
+    # Buscar todos los enlaces visibles
+    enlaces = driver.find_elements(By.TAG_NAME, 'a')
+    textos_genericos = ["click aquí", "haga clic aquí", "aquí", "leer más", "ver más", "más información"]
+
+    enlaces_genericos_count = 0  # Contador de enlaces genéricos
+    enlaces_correctos_count = 0  # Contador de enlaces correctos
+
+    for enlace in enlaces:
+        if enlace.is_displayed() and enlace.get_attribute('href'):
+            link_text = enlace.text.strip().lower()
+
+            # Verificar si el texto del enlace es genérico
+            if any(texto_generico in link_text for texto_generico in textos_genericos):
+                enlaces_genericos_count += 1
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.cell(200, 10, txt=f"- Advertencia: Enlace con texto genérico encontrado: '{link_text}'", ln=True)
+            else:
+                enlaces_correctos_count += 1
+
+    # Añadir resumen al PDF
+    pdf.set_font("Arial", size=10)
+    pdf.set_x(15)
+    pdf.cell(200, 10, txt=f"- Número total de enlaces con texto descriptivo: {enlaces_correctos_count}", ln=True)
+
+    # Guardar el PDF con los resultados
+    output_filename = "reporte_enlaces_genericos.pdf"
+    pdf.output(output_filename, dest='F')
+
+    # Cerrar el navegador
+    driver.quit()
 
 
-
-
+verificar_enlaces_genericos("https://www.mercadolibre.cl")
+#verificar_enlaces_coherencia_titulo("https://www.mercadolibre.cl")
 # Navegar a la URL
 #url = "https://www.mercadolibre.cl"  # URL de ejemplo
 #hdu_tres(url)
