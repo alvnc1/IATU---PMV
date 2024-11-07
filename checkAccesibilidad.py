@@ -20,6 +20,7 @@ import os
 import cv2
 import time
 import spacy
+import requests
 from textstat import textstat
 from inference_sdk import InferenceHTTPClient
 from scenedetect import open_video, SceneManager
@@ -35,6 +36,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
 from selenium.webdriver.support.ui import WebDriverWait
 from io import BytesIO
+from colorama import Fore, Style
 
 # Obtener la ruta del video desde los argumentos de la línea de comandos
 video_path = sys.argv[1]
@@ -91,268 +93,6 @@ for i, scene in enumerate(scene_list):
 
 cap.release()
 
-CLIENT = InferenceHTTPClient(
-    api_url="https://detect.roboflow.com/",
-    api_key="bUyMUjRY0TGSKrbNpksy"
-)
-
-def draw_bounding_boxes(frame, predictions):
-    """
-    Dibuja las bounding boxes sobre el fotograma basado en las predicciones.
-
-    :param frame: El fotograma sobre el cual se dibujarán las bounding boxes.
-    :param predictions: Lista de predicciones del modelo YOLO.
-    :return: El fotograma con las bounding boxes dibujadas.
-    """
-    for prediction in predictions:
-        x0 = int(prediction['x'] - prediction['width'] / 2)
-        y0 = int(prediction['y'] - prediction['height'] / 2)
-        x1 = int(prediction['x'] + prediction['width'] / 2)
-        y1 = int(prediction['y'] + prediction['height'] / 2)
-
-        # Dibujar la bounding box
-        cv2.rectangle(frame, (x0, y0), (x1, y1), (0, 255, 0), 2)
-
-        # Agregar el label y la confianza sobre la bounding box
-        label = f"{prediction['class']} ({prediction['confidence']:.2f})"
-        cv2.putText(frame, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-    return frame
-
-
-def are_images_similar(image1, image2, threshold=0.9):
-    """
-    Compara dos imágenes utilizando SSIM (Structural Similarity Index).
-    Retorna True si las imágenes son similares por encima del umbral dado.
-    """
-    # Convertir las imágenes a escala de grises
-    gray_image1 = cv2.cvtColor(image1, cv2.COLOR_BGR2GRAY)
-    gray_image2 = cv2.cvtColor(image2, cv2.COLOR_BGR2GRAY)
-
-    # Redimensionar imágenes si tienen diferentes tamaños
-    if gray_image1.shape != gray_image2.shape:
-        gray_image2 = cv2.resize(gray_image2, (gray_image1.shape[1], gray_image1.shape[0]))
-
-    # Calcular el SSIM entre las dos imágenes
-    score, _ = ssim(gray_image1, gray_image2, full=True)
-    return score >= threshold
-
-def progressBarDetect(image_dir, output_dir, model_id, class_of_interest, similarity_threshold=0.9):
-    # Crear el directorio de salida si no existe
-    os.makedirs(output_dir, exist_ok=True)
-
-    progressBar_flag = False
-    progressbar_count = 1  # Contador para los nombres de las bounding boxes guardadas
-    saved_images = []  # Lista para guardar las imágenes únicas (bounding boxes)
-
-    # Recorrer todas las imágenes en el directorio
-    for image_filename in os.listdir(image_dir):
-        if image_filename.endswith(('.jpg', '.jpeg', '.png')):  # Filtrar solo las imágenes
-            image_path = os.path.join(image_dir, image_filename)
-
-            # Cargar la imagen con OpenCV
-            frame = cv2.imread(image_path)
-
-            # Realizar la inferencia en la imagen actual
-            result = CLIENT.infer(image_path, model_id=model_id)
-
-            # Filtrar las predicciones para mantener solo la clase de interés
-            filtered_results = [
-                pred for pred in result['predictions']
-                if pred['class'] == class_of_interest
-            ]
-
-            # Si se detectó la clase 'ProgressBar', guardar las bounding boxes
-            if filtered_results:
-                progressBar_flag = True
-                for i, prediction in enumerate(filtered_results):
-                    # Extraer las coordenadas de la bounding box
-                    x0 = int(prediction['x'] - prediction['width'] / 2)
-                    y0 = int(prediction['y'] - prediction['height'] / 2)
-                    x1 = int(prediction['x'] + prediction['width'] / 2)
-                    y1 = int(prediction['y'] + prediction['height'] / 2)
-
-                    # Recortar la región de la bounding box para guardarla como una imagen separada
-                    cropped_image = frame[y0:y1, x0:x1]
-
-                    # Comparar la imagen recortada con las imágenes ya guardadas
-                    similar_found = False
-                    for saved_image in saved_images:
-                        if are_images_similar(cropped_image, saved_image, threshold=similarity_threshold):
-                            similar_found = True
-                            break
-
-                    # Si no se encontró una imagen similar, guardarla
-                    if not similar_found:
-                        output_image_name = f"progressBar_{progressbar_count}_{i + 1}.jpg"
-                        output_image_path = os.path.join(output_dir, output_image_name)
-
-                        # Guardar la imagen recortada
-                        cv2.imwrite(output_image_path, cropped_image)
-                        print(f"Bounding box guardada: {output_image_path}")
-
-                        # Añadir la imagen a la lista de imágenes guardadas
-                        saved_images.append(cropped_image)
-
-                progressbar_count += 1  # Incrementar el contador para el siguiente conjunto de bounding boxes
-
-    print("Proceso de detección de bounding boxes completado.")
-    return progressBar_flag
-
-def cingozDetect(image_dir, output_dir, model_id, excluded_class, similarity_threshold=0.9):
-    # Crear el directorio de salida si no existe
-    os.makedirs(output_dir, exist_ok=True)
-
-    saved_images_by_class = {}  # Diccionario para guardar las imágenes únicas por clase
-    c = 0
-    # Recorrer todas las imágenes en el directorio
-    for image_filename in os.listdir(image_dir):
-        if image_filename.endswith(('.jpg', '.jpeg', '.png')):  # Filtrar solo las imágenes
-            image_path = os.path.join(image_dir, image_filename)
-
-            # Cargar la imagen con OpenCV
-            frame = cv2.imread(image_path)
-
-            # Realizar la inferencia en la imagen actual
-            result = CLIENT.infer(image_path, model_id=model_id)
-
-            # Filtrar las predicciones para excluir la clase 'icon'
-            filtered_results = [
-                pred for pred in result['predictions']
-                if pred['class'] != excluded_class
-            ]
-
-            # Procesar y guardar las bounding boxes para cada clase detectada
-            for prediction in filtered_results:
-                class_name = prediction['class']
-
-                # Crear un subdirectorio para la clase si no existe
-                class_output_dir = os.path.join(output_dir, class_name)
-                os.makedirs(class_output_dir, exist_ok=True)
-
-                # Extraer las coordenadas de la bounding box
-                x0 = int(prediction['x'] - prediction['width'] / 2)
-                y0 = int(prediction['y'] - prediction['height'] / 2)
-                x1 = int(prediction['x'] + prediction['width'] / 2)
-                y1 = int(prediction['y'] + prediction['height'] / 2)
-
-                # Recortar la región de la bounding box para guardarla como una imagen separada
-                cropped_image = frame[y0:y1, x0:x1]
-
-                # Verificar si la clase ya tiene imágenes guardadas
-                if class_name not in saved_images_by_class:
-                    saved_images_by_class[class_name] = []
-
-                # Comparar la imagen recortada con las imágenes ya guardadas para esa clase
-                similar_found = False
-                for saved_image in saved_images_by_class[class_name]:
-                    if are_images_similar(cropped_image, saved_image, threshold=similarity_threshold):
-                        similar_found = True
-                        c += 1
-                        break
-
-                # Si no se encontró una imagen similar, guardarla
-                if not similar_found:
-                    output_image_name = f"{class_name}_{os.path.splitext(image_filename)[0]}.jpg"
-                    output_image_path = os.path.join(class_output_dir, output_image_name)
-
-                    # Guardar la imagen recortada
-                    cv2.imwrite(output_image_path, cropped_image)
-                    print(f"Bounding box de clase '{class_name}' guardada en: {output_image_path}")
-
-                    # Añadir la imagen a la lista de imágenes guardadas para esa clase
-                    saved_images_by_class[class_name].append(cropped_image)
-    print(f"Se encontraron {c} imagenes similares")
-    print("Proceso de detección de bounding boxes completado.")
-
-def appIconDetect(image_dir, output_dir, model_id):
-    """
-    Detecta todas las clases en las imágenes de un directorio, crea un directorio por clase y guarda las imágenes con
-    las bounding boxes correspondientes a cada clase.
-
-    :param image_dir: Directorio que contiene las imágenes a analizar.
-    :param output_dir: Directorio base donde se guardarán las imágenes separadas por clase.
-    :param model_id: ID del modelo de Roboflow a usar.
-    """
-    # Crear el directorio de salida si no existe
-    os.makedirs(output_dir, exist_ok=True)
-    saved_frame_count = 1  # Contador para los nombres de las imágenes guardadas
-
-    # Recorrer todas las imágenes en el directorio
-    for image_filename in os.listdir(image_dir):
-        if image_filename.endswith(('.jpg', '.jpeg', '.png')):  # Filtrar solo las imágenes
-            image_path = os.path.join(image_dir, image_filename)
-
-            # Cargar la imagen con OpenCV
-            frame = cv2.imread(image_path)
-
-            # Realizar la inferencia en la imagen actual
-            result = CLIENT.infer(image_path, model_id=model_id)
-
-            # Obtener las predicciones (todas las clases)
-            predictions = result['predictions']
-
-            # Procesar las predicciones para cada clase detectada
-            class_bboxes = {}
-            for prediction in predictions:
-                class_name = prediction['class']
-                if class_name not in class_bboxes:
-                    class_bboxes[class_name] = []
-                class_bboxes[class_name].append(prediction)
-
-            # Crear una imagen por cada clase con sus bounding boxes
-            for class_name, class_predictions in class_bboxes.items():
-                # Crear un subdirectorio para la clase si no existe
-                class_output_dir = os.path.join(output_dir, class_name)
-                os.makedirs(class_output_dir, exist_ok=True)
-
-                # Dibujar las bounding boxes solo para esta clase
-                frame_copy = frame.copy()
-                frame_with_boxes = draw_bounding_boxes(frame_copy, class_predictions)
-
-                # Guardar la imagen con las bounding boxes de esta clase
-                output_image_path = os.path.join(class_output_dir, f"{class_name}_{saved_frame_count}.jpg")
-                cv2.imwrite(output_image_path, frame_with_boxes)
-                print(f"Imagen guardada con bounding boxes de clase '{class_name}' en: {output_image_path}")
-
-            saved_frame_count += 1  # Incrementar el contador para la siguiente imagen
-
-    print("Proceso de detección y guardado de bounding boxes por clase completado.")
-
-model_id = "progressbar-iptbc/6"  # Reemplaza con el ID de tu modelo de Roboflow
-class_of_interest = "ProgressBar"  # Clase que deseas detectar
-
-
-image_dir = "capturas"  # Reemplaza con la ruta de tu video
-output_dir = "output_pb"
-os.makedirs(output_dir, exist_ok=True)
-progressBar_flag = progressBarDetect(image_dir, output_dir, model_id, class_of_interest)
-if progressBar_flag:
-    print("ProgressBar detectado en el video.")
-else:
-    print("ProgressBar no detectado en el video.")
-
-
-
-model_id = "cingoz8/1"  # Reemplaza con el ID de tu modelo de Roboflow
-excluded_class = "icon"  # Clase que deseas detectar
-
-
-image_dir = "capturas"  # Reemplaza con la ruta de tu video
-output_dir = "output_cingoz"
-os.makedirs(output_dir, exist_ok=True)
-cingozDetect(image_dir, output_dir, model_id, excluded_class)
-
-
-model_id = "app-icon/45"  # Reemplaza con el ID de tu modelo de Roboflow
-
-
-video_path = "capturas"  # Reemplaza con la ruta de tu video
-output_dir = "output_icon"
-os.makedirs(output_dir, exist_ok=True)
-appIconDetect(image_dir, output_dir, model_id) 
-
-
 def obtener_nombre_elemento(element, idx):
     """Devuelve un nombre representativo del elemento para usar en logs y archivos."""
     if element.get_attribute('id'):
@@ -364,123 +104,6 @@ def obtener_nombre_elemento(element, idx):
     else:
         return f"elemento_{idx}"
 
-# Crea un objeto PDF
-pdf = FPDF()
-pdf.add_page()
-# Directorio de imágenes de entrada
-input_dir = "capturas"
-output_base_dir = "output_evaluated_images"
-os.makedirs(output_base_dir, exist_ok=True)
-
-# Inicializar el diccionario para las clases
-dic_clases = {}
-
-# Obtener dimensiones de la página
-page_width = pdf.w
-page_height = pdf.h
-
-# Insertar el logo centrado en la parte superior
-logo_width = 40  # Ancho del logo, ajusta según el tamaño de tu imagen
-x_logo = (page_width - logo_width) / 2  # Calcular el x para centrar la imagen
-pdf.image("logo.png", x=x_logo, y=10, w=logo_width)
-
-# Establecer la fuente para el título
-pdf.set_font("Arial", 'B', 24)
-
-# Calcular la posición para centrar el título
-title = "Revisión de Criterios Usabilidad Web"
-title_width = pdf.get_string_width(title)
-pdf.set_xy((page_width - title_width) / 2, 70)  # Ajustar `y=70` para colocar debajo del logo
-pdf.cell(title_width, 10, txt=title, ln=True)
-
-# Añadir subtítulo debajo del título con espaciado adecuado
-subtitle = "Análisis Integral de Componentes Web"
-pdf.set_font("Arial", '', 16)  # Fuente más pequeña para el subtítulo
-subtitle_width = pdf.get_string_width(subtitle)
-pdf.set_xy((page_width - subtitle_width) / 2, 85)  # Ajustar `y=85` para centrar el subtítulo debajo del título
-pdf.cell(subtitle_width, 10, txt=subtitle, ln=True)
-
-# Añadir la fecha de generación un poco más abajo
-pdf.set_font("Arial", '', 12)
-from datetime import datetime
-fecha_actual = datetime.now().strftime('%d/%m/%Y')
-fecha_text = f"Fecha de generación: {fecha_actual}"
-fecha_width = pdf.get_string_width(fecha_text)
-pdf.set_xy((page_width - fecha_width) / 2, 100)  # Ajustar `y=100` para la fecha
-pdf.cell(fecha_width, 10, txt=fecha_text, ln=True)
-
-# Iniciar una página antes del loop
-#pdf.add_page()
-
-# Agregar el título en la primera página
-#pdf.set_font('Arial', 'B', 14)  # Configurar la fuente: Arial, Negrita, tamaño 16
-#pdf.cell(200, 10, "Capturas de Frames y Detección de Componentes", ln=True, align='C')  # Centrar el título
-#pdf.ln(20)  # Añadir espacio después del título
-
-# Variables de posición para el layout de las imágenes
-x_pos = 10  # Posición horizontal inicial
-y_pos = 30  # Posición vertical inicial, debajo del título
-image_width = 180  # Ancho ajustado para cada imagen
-image_height = 100  # Altura ajustada para cada imagen
-space_between_images = 10  # Espacio entre imágenes
-page_height = 297  # Altura de la página A4 en mm
-margin_bottom = 10  # Margen inferior de la página
-
-# Procesar cada imagen
-# for idx, image_filename in enumerate(os.listdir(input_dir)):
-#     if image_filename.endswith(('.jpg', '.jpeg', '.png')):
-#         image_path = os.path.join(input_dir, image_filename)
-
-#         # Realizar la inferencia con los modelos
-#         result = CLIENT.infer(image_path, model_id="cingoz8/1")
-#         result_model_2 = CLIENT.infer(image_path, model_id="app-icon/48")
-
-#         # Combinar los resultados de ambos modelos
-#         combined_results = result['predictions'] + result_model_2['predictions']
-
-#         # Crear subdirectorio para la imagen
-#         image_output_dir = os.path.join(output_base_dir, os.path.splitext(image_filename)[0])
-#         os.makedirs(image_output_dir, exist_ok=True)
-
-#         # Cargar la imagen original
-#         image = cv2.imread(image_path)
-#         original_height, original_width, _ = image.shape
-
-#         # Procesar los resultados y dibujar bounding boxes en la imagen original
-#         for i, prediction in enumerate(combined_results):
-#             # Coordenadas de la bounding box
-#             x0 = int(prediction['x'] - prediction['width'] / 2)
-#             y0 = int(prediction['y'] - prediction['height'] / 2)
-#             x1 = int(prediction['x'] + prediction['width'] / 2)
-#             y1 = int(prediction['y'] + prediction['height'] / 2)
-
-#             # Dibujar la bounding box en la imagen original
-#             cv2.rectangle(image, (x0, y0), (x1, y1), color=(0, 255, 0), thickness=2)
-
-#             # Poner el label (clase y confianza) encima de la bounding box
-#             label = f"{prediction['class']} ({prediction['confidence']:.2f})"
-#             cv2.putText(image, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-
-#         # Guardar la imagen original con todas las bounding boxes dibujadas
-#         output_image_path = os.path.join(image_output_dir, os.path.basename(image_path))
-#         cv2.imwrite(output_image_path, image)
-
-#         # Verificar si hay suficiente espacio para la imagen actual
-#         if y_pos + image_height + margin_bottom > page_height:
-#             pdf.add_page()  # Añadir nueva página
-#             y_pos = 10  # Resetear la posición vertical para la nueva página
-
-#         # Colocar la imagen en la posición calculada
-#         pdf.image(output_image_path, x=x_pos, y=y_pos, w=image_width, h=image_height)
-
-#         # Ajustar la posición vertical para la siguiente imagen
-#         y_pos += image_height + space_between_images
-
-# Agrega una página
-pdf.add_page()
-
-# Establece la fuente (tipografía y tamaño)
-pdf.set_font("Arial", size=14)# Crea un objeto PDF
 pdf = FPDF()
 pdf.add_page()
 # Directorio de imágenes de entrada
@@ -592,17 +215,86 @@ margin_bottom = 10  # Margen inferior de la página
 #         # Ajustar la posición vertical para la siguiente imagen
 #         y_pos += image_height + space_between_images
 
-# Agrega una página
+# Inicializar el cliente HTTP para inferencias
+CLIENT = InferenceHTTPClient(
+    api_url="https://detect.roboflow.com",
+    api_key="bUyMUjRY0TGSKrbNpksy"
+)
+
+# Directorio de imágenes de entrada
+input_dir = "capturas"
+output_base_dir = "output_evaluated_images"
+os.makedirs(output_base_dir, exist_ok=True)
+
+# Inicializar el diccionario para las clases
+dic_clases = {}
+
+# Obtener dimensiones de la página
+page_width = pdf.w
+page_height = pdf.h
+# Centrar el título horizontal y verticalmente
+pdf.set_xy(0, page_height / 2 - 10)  # Centramos en Y a la mitad de la página
+pdf.set_font("Arial", 'B', 16)
+pdf.cell(page_width, 10, txt="Componentes Encontrados y Elementos a Analizar", ln=True, align="C")
+
+# Procesar cada imagen
+for idx, image_filename in enumerate(os.listdir(input_dir)):
+    if image_filename.endswith(('.jpg', '.jpeg', '.png')):
+        image_path = os.path.join(input_dir, image_filename)
+
+        # Realizar la inferencia con los modelos
+        result = CLIENT.infer(image_path, model_id="cingoz8/1")
+        result_model_2 = CLIENT.infer(image_path, model_id="app-icon/45")
+
+        # Combinar los resultados de ambos modelos
+        combined_results = result['predictions'] + result_model_2['predictions']
+
+        # Crear subdirectorio para la imagen
+        image_output_dir = os.path.join(output_base_dir, os.path.splitext(image_filename)[0])
+        os.makedirs(image_output_dir, exist_ok=True)
+
+        # Cargar la imagen original
+        image = cv2.imread(image_path)
+        original_height, original_width, _ = image.shape
+
+        # Procesar los resultados y dibujar bounding boxes en la imagen original
+        for i, prediction in enumerate(combined_results):
+            # Coordenadas de la bounding box
+            x0 = int(prediction['x'] - prediction['width'] / 2)
+            y0 = int(prediction['y'] - prediction['height'] / 2)
+            x1 = int(prediction['x'] + prediction['width'] / 2)
+            y1 = int(prediction['y'] + prediction['height'] / 2)
+
+            # Dibujar la bounding box en la imagen original
+            cv2.rectangle(image, (x0, y0), (x1, y1), color=(0, 255, 0), thickness=2)
+
+            # Poner el label (clase y confianza) encima de la bounding box
+            label = f"{prediction['class']} ({prediction['confidence']:.2f})"
+            cv2.putText(image, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        # Guardar la imagen original con todas las bounding boxes dibujadas
+        output_image_path = os.path.join(image_output_dir, os.path.basename(image_path))
+        cv2.imwrite(output_image_path, image)
+
+        # Añadir la imagen completa con bounding boxes al PDF
+        if idx % 2 == 0:
+            pdf.add_page()  # Añadir nueva página para cada par de imágenes
+
+        # Posicionar la primera o segunda imagen en la página
+        x_pos = 10  # Margen izquierdo
+        y_pos = 10 if idx % 2 == 0 else 150  # Posicionar la imagen: arriba (y=10) o abajo (y=150)
+        pdf.image(output_image_path, x=x_pos, y=y_pos, w=180)  # Ajustar el tamaño según sea necesario
+
 pdf.add_page()
 
 # Establece la fuente (tipografía y tamaño)
 pdf.set_font("Arial", size=14)
 pdf.ln(10)
 pdf.set_font("Arial", "B", size=14)
-pdf.cell(200, 10, txt="Criterio: Validación de Accesibilidad Visual", ln=True, align='C')
+pdf.cell(200, 10, txt="Criterio: Validación de Accesibilidad", ln=True, align='C')
 def verificar_accesibilidad_lectores_pantalla(url):
     # Agrega un título
-    pdf.set_font("Arial", "I", size=10)
+    pdf.set_font("Arial", " I", size=10)
     pdf.cell(200, 10, txt="Lectores de pantalla:", ln=True, align='L')
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -1658,6 +1350,7 @@ def perform_search(url, query="test"):
         search_box = WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.XPATH, "//input[@type='text' or @name='q' or @id='search']"))
         )
+        pdf.set_font("Arial", size=8)
         pdf.set_x(15)
         pdf.multi_cell(0, 6, "- Campo de búsqueda encontrado.")
         
@@ -1754,7 +1447,7 @@ def check_error_messages(url):
     """Verifica mensajes de error claros y directivos en la UI."""
 
     pdf.set_font("Arial", "I", size=10)
-    pdf.cell(200, 10, txt="Validación de Mensajes de Error Claros y Directivos", ln=True, align='L')
+    pdf.cell(200, 10, txt="Validación de Mensajes de Error Claros y Directos", ln=True, align='L')
 
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -1779,37 +1472,41 @@ def check_error_messages(url):
             pdf.set_x(15)
             pdf.multi_cell(0, 6, f"- {len(error_messages)} mensajes de error encontrados:")
             for msg in error_messages:
+                pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
                 pdf.multi_cell(0, 6, f"   - {msg.text.strip()}")
         else:
+            pdf.set_font("Arial", size=8)
             pdf.set_x(15)
             pdf.multi_cell(0, 6, "- No se encontraron mensajes de error en la UI.")
 
         # Verificar instrucciones claras para corregir el error
         if instructions:
+            pdf.set_font("Arial", size=8)
             pdf.set_x(15)
             pdf.multi_cell(0, 6, f"- {len(instructions)} instrucciones para corregir errores encontradas:")
             for instr in instructions:
                 pdf.set_x(15)
-                pdf.multi_cell(0, 6, f"   - {instr.text.strip()}")
+                pdf.multi_cell(0, 6, f"- {instr.text.strip()}")
         else:
+            pdf.set_font("Arial", size=8)
             pdf.set_x(15)
             pdf.multi_cell(0, 6, "- No se encontraron instrucciones claras para corregir errores.")
 
         # Comprobación final
         if error_messages and instructions:
+            pdf.set_font("Arial", size=8)
             pdf.set_x(15)
             pdf.multi_cell(0, 6, "- La página CUMPLE con el criterio de mensajes de error claros y directivos.")
         else:
+            pdf.set_font("Arial", size=8)
             pdf.set_x(15)
             pdf.multi_cell(0, 6, "- La página NO CUMPLE con el criterio de mensajes de error claros y directivos.")
 
     except TimeoutException:
-        pdf.set_x(15)
-        pdf.multi_cell(0, 6, "- La página tardó demasiado en cargar o no contiene elementos esperados.")
+        print("- La página tardó demasiado en cargar o no contiene elementos esperados.")
     except Exception as e:
-        pdf.set_x(15)
-        pdf.multi_cell(0, 6, f"- Error inesperado: {str(e)}")
+        print(f"- Error inesperado: {str(e)}")
     finally:
         driver.quit()
 
@@ -1864,8 +1561,8 @@ def hdu_cuatro(url):
             return img.size[0] <= max_size[0] and img.size[1] <= max_size[1]
     # Inicializar el PDF
     
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Verificación de Legibilidad de Texto en la UI", ln=True, align='C')
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Verificación de Legibilidad de Texto en la UI", ln=True, align='L')
     # Extraer todos los elementos de texto
     elements = driver.find_elements(By.XPATH, "//*[not(self::script or self::style)][text()]")
 
@@ -1881,8 +1578,7 @@ def hdu_cuatro(url):
             if gunning_fog > 12 or flesch_reading_ease < 60:
                 pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
-                pdf.multi_cell(200, 10, txt=f"- Advertencia: Texto con legibilidad insuficiente encontrado: '{text[:50]}...'\n  Gunning Fog: {gunning_fog}, Flesch Reading Ease: {flesch_reading_ease}")
-                
+                pdf.multi_cell(0, 6, txt=f"- Advertencia: Texto con legibilidad insuficiente encontrado: '{text[:50].replace('\n', '')}...'\n  Gunning Fog: {gunning_fog}, Flesch Reading Ease: {flesch_reading_ease}")      
                 # Capturar la imagen del elemento
                 location = elem.location
                 size = elem.size
@@ -1925,9 +1621,8 @@ def verificar_enlaces_coherencia_titulo(url):
     enlaces_dir = os.path.join(capturas_dir, "enlaces")
     os.makedirs(enlaces_dir, exist_ok=True)
 
-    
-    pdf.add_page()
-    pdf.cell(200, 10, txt="Verificación de Coherencia entre Enlaces y Títulos de Página", ln=True, align='C')
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Verificación de Coherencia entre Enlaces y Títulos de Página", ln=True, align='L')
 
     # Navegar a la URL
     driver.get(url)
@@ -1963,7 +1658,7 @@ def verificar_enlaces_coherencia_titulo(url):
             else:
                 pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
-                pdf.multi_cell(200, 10, txt=f"- Advertencia: El enlace '{safe_link_text}' NO coincide con el título de la página de destino: '{safe_page_title}'")
+                pdf.multi_cell(0, 6, f"- Advertencia: El enlace '{safe_link_text.replace('\n', '')}' NO coincide con el título de la página de destino: '{safe_page_title.replace('\n', '')}'")
                 
                 # Guardar la captura de pantalla de la página de destino
                 screenshot_path = os.path.join(enlaces_dir, f"enlace_{index}_captura.png")
@@ -1993,7 +1688,7 @@ def verificar_enlaces_coherencia_titulo(url):
     # Añadir el resumen de los enlaces que coinciden al PDF
     pdf.set_font("Arial", size=10)
     pdf.set_x(15)
-    pdf.multi_cell(200, 10, txt=f"- Número de enlaces que coinciden con el título de la página de destino: {enlaces_coinciden}")
+    pdf.multi_cell(0, 6, txt=f"- Número de enlaces que coinciden con el título de la página de destino: {enlaces_coinciden}")
 
     # Guardar el PDF con los resultados
     #output_filename = "reporte_coherencia_enlaces.pdf"
@@ -2014,9 +1709,8 @@ def verificar_enlaces_genericos(url):
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-    
-    pdf.add_page()
-    pdf.cell(200, 10, txt="Verificación de Enlaces con Texto Genérico", ln=True, align='C')
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Verificación de Enlaces con Texto Genérico", ln=True, align='L')
 
     # Navegar a la URL
     driver.get(url)
@@ -2025,7 +1719,7 @@ def verificar_enlaces_genericos(url):
     enlaces = driver.find_elements(By.TAG_NAME, 'a')
     textos_genericos = ["click aquí", "haga clic aquí", "aquí", "leer más", "ver más", "más información"]
 
-    enlaces_genericos_count = 0  # Contador de enlaces genéricos
+    enlaces_genericos_count = 0  # Conta    dor de enlaces genéricos
     enlaces_correctos_count = 0  # Contador de enlaces correctos
 
     for enlace in enlaces:
@@ -2035,16 +1729,13 @@ def verificar_enlaces_genericos(url):
             # Verificar si el texto del enlace es genérico
             if any(texto_generico in link_text for texto_generico in textos_genericos):
                 enlaces_genericos_count += 1
-                pdf.set_font("Arial", size=8)
-                pdf.set_x(15)
-                pdf.cell(200, 10, txt=f"- Advertencia: Enlace con texto genérico encontrado: '{link_text}'", ln=True)
             else:
                 enlaces_correctos_count += 1
 
     # Añadir resumen al PDF
     pdf.set_font("Arial", size=10)
     pdf.set_x(15)
-    pdf.cell(200, 10, txt=f"- Número total de enlaces con texto descriptivo: {enlaces_correctos_count}", ln=True)
+    pdf.multi_cell(0, 6, txt=f"- Número total de enlaces con texto descriptivo: {enlaces_correctos_count}")
 
     # Guardar el PDF con los resultados
     #output_filename = "reporte_enlaces_genericos.pdf"
@@ -2067,8 +1758,8 @@ def verificar_autenticacion_facil(url):
     os.makedirs(auth_dir, exist_ok=True)
 
     
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Verificación de Métodos de Autenticación en la UI", ln=True, align='C')
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Verificación de Métodos de Autenticación en la UI", ln=True, align='L')
 
     # Navegar a la URL
     driver.get(url)
@@ -2088,7 +1779,7 @@ def verificar_autenticacion_facil(url):
             # Encontró un formulario de autenticación
             pdf.set_font("Arial", size=8)
             pdf.set_x(15)
-            pdf.multi_cell(200, 10, txt=f"- Formulario de autenticación común encontrado (Formulario #{form_index}).")
+            pdf.multi_cell(0, 6, txt=f"- Formulario de autenticación común encontrado (Formulario #{form_index}).")
             
             # Verificar si hay métodos alternativos (ej.: opciones biométricas, enlace mágico, etc.)
             botones = form.find_elements(By.TAG_NAME, 'button')
@@ -2103,13 +1794,13 @@ def verificar_autenticacion_facil(url):
                     autenticacion_alternativas.append(alternativa)
                     pdf.set_font("Arial", size=8)
                     pdf.set_x(15)
-                    pdf.multi_cell(200, 10, txt=f"  - Método de autenticación alternativa encontrado: {alternativa.capitalize()}")
+                    pdf.multi_cell(0, 6, txt=f"  - Método de autenticación alternativa encontrado: {alternativa.capitalize()}")
 
             # Verificar si el formulario tiene captcha complejo (indicador de autenticación difícil)
             if any('captcha' in elem.get_attribute('class').lower() for elem in form.find_elements(By.XPATH, ".//*[contains(@class, 'captcha')]")):
                 pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
-                pdf.multi_cell(200, 10, txt="  - Advertencia: Se encontró un CAPTCHA, podría dificultar la autenticación.")
+                pdf.multi_cell(0, 6, txt="  - Advertencia: Se encontró un CAPTCHA, podría dificultar la autenticación.")
 
             # Capturar la imagen del formulario de autenticación
             form_location = form.location
@@ -2139,13 +1830,13 @@ def verificar_autenticacion_facil(url):
             if autenticacion_alternativas:
                 pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
-                pdf.multi_cell(200, 10, txt=f"  - Métodos de autenticación alternativa disponibles: {', '.join(autenticacion_alternativas)}")
+                pdf.multi_cell(0, 6, txt=f"  - Métodos de autenticación alternativa disponibles: {', '.join(autenticacion_alternativas)}")
 
     # Si no se encontraron alternativas a pruebas cognitivas difíciles
     if not autenticacion_alternativa_encontrada:
         pdf.set_font("Arial", size=8)
         pdf.set_x(15)
-        pdf.multi_cell(200, 10, txt="- Advertencia: No se encontraron métodos de autenticación alternativos que no dependan de la función cognitiva.")
+        pdf.multi_cell(0, 6, txt="- Advertencia: No se encontraron métodos de autenticación alternativos que no dependan de la función cognitiva.")
 
     # Guardar el PDF con los resultados
    
@@ -2181,7 +1872,7 @@ def verificar_autenticacion_facil(url):
 
     
     pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Verificación de Métodos de Autenticación en la UI", ln=True, align='C')
+    pdf.cell(200, 10, txt="Verificación de Métodos de Autenticación en la UI", ln=True, align='L')
 
     # Navegar a la URL
     driver.get(url)
@@ -2201,7 +1892,7 @@ def verificar_autenticacion_facil(url):
             # Encontró un formulario de autenticación
             pdf.set_font("Arial", size=8)
             pdf.set_x(15)
-            pdf.multi_cell(200, 10, txt=f"- Formulario de autenticación común encontrado (Formulario #{form_index}).")
+            pdf.multi_cell(0, 6, txt=f"- Formulario de autenticación común encontrado (Formulario #{form_index}).")
             
             # Verificar si hay métodos alternativos (ej.: opciones biométricas, enlace mágico, etc.)
             botones = form.find_elements(By.TAG_NAME, 'button')
@@ -2216,13 +1907,13 @@ def verificar_autenticacion_facil(url):
                     autenticacion_alternativas.append(alternativa)
                     pdf.set_font("Arial", size=8)
                     pdf.set_x(15)
-                    pdf.multi_cell(200, 10, txt=f"  - Método de autenticación alternativa encontrado: {alternativa.capitalize()}")
+                    pdf.multi_cell(0, 6, txt=f"  - Método de autenticación alternativa encontrado: {alternativa.capitalize()}")
 
             # Verificar si el formulario tiene captcha complejo (indicador de autenticación difícil)
             if any('captcha' in elem.get_attribute('class').lower() for elem in form.find_elements(By.XPATH, ".//*[contains(@class, 'captcha')]")):
                 pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
-                pdf.multi_cell(200, 10, txt="  - Advertencia: Se encontró un CAPTCHA, podría dificultar la autenticación.")
+                pdf.multi_cell(0, 6, txt="  - Advertencia: Se encontró un CAPTCHA, podría dificultar la autenticación.")
 
             # Capturar la imagen del formulario de autenticación
             form_location = form.location
@@ -2252,13 +1943,13 @@ def verificar_autenticacion_facil(url):
             if autenticacion_alternativas:
                 pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
-                pdf.multi_cell(200, 10, txt=f"  - Métodos de autenticación alternativa disponibles: {', '.join(autenticacion_alternativas)}")
+                pdf.multi_cell(0, 6, txt=f"  - Métodos de autenticación alternativa disponibles: {', '.join(autenticacion_alternativas)}")
 
     # Si no se encontraron alternativas a pruebas cognitivas difíciles
     if not autenticacion_alternativa_encontrada:
         pdf.set_font("Arial", size=8)
         pdf.set_x(15)
-        pdf.multi_cell(200, 10, txt="- Advertencia: No se encontraron métodos de autenticación alternativos que no dependan de la función cognitiva.")
+        pdf.multi_cell(0, 6, txt="- Advertencia: No se encontraron métodos de autenticación alternativos que no dependan de la función cognitiva.")
 
     # Guardar el PDF con los resultados
    
@@ -2278,7 +1969,591 @@ def is_mostly_black(image_path, threshold=0.9):
         num_black_pixels = sum(1 for pixel in img.getdata() if pixel < 30)  # Umbral para considerar un píxel "negro"
         black_ratio = num_black_pixels / num_pixels
         return black_ratio >= threshold
+  
+def validate_input_targets(url):
+    """Valida si los botones y enlaces cumplen con el tamaño mínimo recomendado."""
     
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Validación de Tamaño de Objetivos de Entrada", ln=True, align='L')
+
+
+    try:
+        driver.get(url)
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+        elements = driver.find_elements(By.XPATH, "//button | //a")
+        total_elements = len(elements)
+        small_elements = [element for element in elements if element.size['width'] < 44 or element.size['height'] < 44]
+
+        total_small_elements = len(small_elements)
+
+        # Resumen consolidado
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(0, 6, f"Total de objetivos de entrada analizados: {total_elements}")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(0, 6, f"Objetivos que no cumplen con el tamaño mínimo de 44x44 píxeles: {total_small_elements}")
+
+        if total_small_elements > 0:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"Porcentaje de elementos que no cumplen: {(total_small_elements / total_elements) * 100:.2f}%")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página NO CUMPLE con el criterio de accesibilidad en objetivos de entrada.")
+        else:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página CUMPLE con el criterio de accesibilidad en objetivos de entrada.")
+
+    except TimeoutException:
+        print("- Error: La página tardó demasiado en cargar.")
+    except Exception as e:
+        print(f"- Error inesperado: {str(e)}")
+    finally:
+        driver.quit()
+
+def detect_blinking_content(url):
+    """Detecta contenido que podría parpadear más de tres veces por segundo."""
+
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Detección de Contenidos que Parpadean", ln=True, align='L')
+
+
+    try:
+        driver.get(url)
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+        # Seleccionar elementos potencialmente problemáticos
+        animated_elements = driver.find_elements(By.XPATH, "//*[contains(@style, 'animation') or contains(@style, 'blink')]")
+        
+        if not animated_elements:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- No se encontraron elementos que parpadeen o tengan animaciones.")
+            return
+        
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(0, 6, f"- Total de elementos animados o con posible parpadeo: {len(animated_elements)}")
+
+        high_frequency_count = 0
+        for element in animated_elements:
+            try:
+                # Verificar estilo de animación
+                style = element.get_attribute("style")
+                if "animation-duration" in style or "animation" in style:
+                    animation_duration = extract_animation_duration(style)
+                    if animation_duration and animation_duration < 0.33:
+                        high_frequency_count += 1
+            except Exception as e:
+                print(f"- Error al analizar un elemento: {str(e)}")
+        
+        if high_frequency_count > 0:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Se encontraron {high_frequency_count} elementos que podrían parpadear más de 3 veces por segundo.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página NO CUMPLE con el criterio de accesibilidad para prevenir contenido que parpadee.")
+        else:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- Todos los elementos animados cumplen con el criterio de accesibilidad.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página CUMPLE con el criterio de accesibilidad para contenido parpadeante.")
+
+    except TimeoutException:
+        print("- Error: La página tardó demasiado en cargar.")
+    except Exception as e:
+        print(f"- Error inesperado: {str(e)}")
+    finally:
+        driver.quit()
+
+def extract_animation_duration(style):
+    """Extrae la duración de la animación desde el atributo style."""
+    try:
+        duration_str = [s for s in style.split(';') if 'animation-duration' in s]
+        if duration_str:
+            duration_value = duration_str[0].split(':')[1].strip()
+            if 's' in duration_value:
+                return float(duration_value.replace('s', ''))
+    except Exception as e:
+        print(f"- Error al extraer duración de animación: {str(e)}")
+    return None
+
+def verificar_pestanas_navegacion(url):
+    """Verifica que las pestañas de navegación estén en la parte superior y sean clickeables."""
+    
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Ubicación y Clicabilidad de las Pestañas de Navegación en la Parte Superior", ln=True, align='L')
+
+
+
+    try:
+        driver.get(url)
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+        # Buscar la barra de navegación superior
+        nav_bar = driver.find_element(By.XPATH, "//nav")
+
+        # Verificar ubicación de la barra de navegación
+        nav_bar_location = nav_bar.location['y']
+        if nav_bar_location <= 200:  # En la parte superior de la página
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La barra de navegación está ubicada en la parte superior de la página.")
+        else:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La barra de navegación NO está ubicada en la parte superior de la página.")
+
+        # Verificar que las pestañas dentro de la barra de navegación sean clickeables
+        nav_items = nav_bar.find_elements(By.XPATH, ".//a | .//button")
+        total_items = len(nav_items)
+        clickeable_items = 0
+
+        for item in nav_items:
+            if item.is_displayed() and item.is_enabled():
+                clickeable_items += 1
+
+        if total_items > 0:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Total de pestañas detectadas: {total_items}.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Total de pestañas clickeables: {clickeable_items}.")
+            if total_items == clickeable_items:
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(0, 6, "- Todas las pestañas de navegación son clickeables.")
+            else:
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(0, 6, "- No todas las pestañas de navegación son clickeables.")
+        else:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- No se encontraron pestañas de navegación en la barra.")
+
+    except NoSuchElementException:
+        print("- No se encontró una barra de navegación.")
+    except TimeoutException:
+        print("- La página tardó demasiado en cargar.")
+    except Exception as e:
+        print(f"- Error inesperado: {str(e)}")
+    finally:
+        driver.quit()
+
+def extract_color_value(style):
+    """Extrae valores de color del atributo de estilo en formato RGB o HEX."""
+    try:
+        match_rgb = re.search(r'rgb\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)', style)
+        match_hex = re.search(r'#([a-fA-F0-9]{6})', style)
+        if match_rgb:
+            return tuple(map(int, match_rgb.groups()))
+        elif match_hex:
+            return match_hex.group(0)
+    except Exception as e:
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(0, 6, f"Error extrayendo el color: {str(e)}")
+    return None
+
+def verificar_errores_de_entrada(url):
+    """Verifica que los errores de entrada estén destacados visualmente y acompañados de mensajes claros."""
+    
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Verificación de Errores de Entrada")
+
+    try:
+        driver.get(url)
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+        # Buscar mensajes de error junto a inputs
+        error_inputs = driver.find_elements(By.XPATH, "//input[@aria-invalid='true'] | //input[contains(@class, 'error')]")
+        error_messages = driver.find_elements(By.XPATH, "//div[contains(@class, 'error') or contains(@class, 'alert') or contains(@role, 'alert')]")
+
+        total_errors = len(error_inputs)
+        total_messages = len(error_messages)
+
+        # Verificar mensajes y colores de fondo
+        highlighted_errors = 0
+        for input_element in error_inputs:
+            style = input_element.get_attribute("style")
+            color = extract_color_value(style)
+            if color:
+                highlighted_errors += 1
+
+        # Resultados
+        if total_errors > 0:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Total de campos con errores detectados: {total_errors}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Total de mensajes de error claros encontrados: {total_messages}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Campos con errores visualmente destacados: {highlighted_errors} de {total_errors}")
+            
+            if highlighted_errors == total_errors and total_messages >= total_errors:
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(0, 6, "- La página CUMPLE con el criterio de visualización de errores.")
+            else:
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(0, 6, "- La página NO CUMPLE con el criterio de visualización de errores.")
+        else:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- No se encontraron errores de entrada en el formulario.")
+
+    except TimeoutException:
+        print("- Error: La página tardó demasiado en cargar.")
+    except Exception as e:
+        print(f"- Error inesperado: {str(e)}")
+    finally:
+        driver.quit()
+
+
+def verificar_orden_de_enfoque(url):
+    """Verifica que el orden de enfoque sea lógico y secuencial en la página."""
+
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Verificación de Orden de Enfoque Lógico", ln=True, align='L')
+
+    try:
+        driver.get(url)
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+        # Obtener todos los elementos con tabindex o foco por defecto
+        focusable_elements = driver.find_elements(By.XPATH, "//*[@tabindex or self::a or self::button or self::input or self::textarea]")
+
+        if not focusable_elements:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- No se encontraron elementos con orden de enfoque.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página NO CUMPLE con el criterio de enfoque lógico.")
+            return
+
+        # Verificar el orden lógico de tabindex
+        sequential_tabindex = True
+        previous_index = -1
+        tab_sequence = []
+
+        for element in focusable_elements:
+            tabindex = element.get_attribute("tabindex")
+            if tabindex is not None:
+                tab_index = int(tabindex)
+                tab_sequence.append((element.tag_name, tab_index))
+                if tab_index < previous_index:
+                    sequential_tabindex = False
+                previous_index = tab_index
+            else:
+                tab_sequence.append((element.tag_name, "default"))
+
+        # Resumen
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(0, 6, f"- Total de elementos focuseables detectados: {len(focusable_elements)}.")
+        if sequential_tabindex:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- El orden de enfoque es lógico y secuencial.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página CUMPLE con el criterio de orden de enfoque lógico.")
+        else:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- El orden de enfoque no es lógico.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página NO CUMPLE con el criterio de enfoque lógico.")
+        
+        
+
+    except TimeoutException:
+        print("- Error: La página tardó demasiado en cargar.")
+    except Exception as e:
+        print(f"- Error inesperado: {str(e)}")
+    finally:
+        driver.quit()
+
+def verificar_alternativas_gestos(url):
+    """Verifica si las funciones con gestos complejos tienen alternativas accesibles."""
+
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Verificación de Alternativas a Gestos Multipunto", ln=True, align='L')
+
+
+    try:
+        driver.get(url)
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+        # Buscar elementos que puedan requerir gestos complejos
+        elementos_gestos = driver.find_elements(By.XPATH, "//*[@ondrag or @onpinch or @ontouchmove or @onmousedown]")
+
+        if not elementos_gestos:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- No se encontraron elementos que requieran gestos complejos.")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página CUMPLE con el criterio de accesibilidad para gestos simplificados.")
+            return
+
+        # Verificar alternativas accesibles (tabindex para navegación por teclado)
+        elementos_con_alternativa = 0
+        for elemento in elementos_gestos:
+            tabindex = elemento.get_attribute("tabindex")
+            aria_role = elemento.get_attribute("role")
+            if tabindex is not None or aria_role in ["button", "link"]:
+                elementos_con_alternativa += 1
+
+        total_elementos = len(elementos_gestos)
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(0, 6, f"- Total de elementos que requieren gestos complejos: {total_elementos}.")
+        pdf.set_font("Arial", size=8)
+        pdf.set_x(15)
+        pdf.multi_cell(0, 6, f"- Total de elementos con alternativas accesibles: {elementos_con_alternativa} de {total_elementos}.")
+
+        if elementos_con_alternativa == total_elementos:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página CUMPLE con el criterio de accesibilidad para gestos complejos.")
+        else:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "- La página NO CUMPLE con el criterio de accesibilidad para gestos complejos.")
+
+    except TimeoutException:
+        print("- Error: La página tardó demasiado en cargar.")
+    except Exception as e:
+        print(f"- Error inesperado: {str(e)}")
+    finally:
+        driver.quit()
+
+def extract_color_value(style):
+    """Extrae valores de color del atributo de estilo en formato RGB o HEX."""
+    try:
+        match_rgb = re.search(r'rgb\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)', style)
+        match_hex = re.search(r'#([a-fA-F0-9]{6})', style)
+        if match_rgb:
+            return tuple(map(int, match_rgb.groups()))
+        elif match_hex:
+            return match_hex.group(0)
+    except Exception as e:
+        print(f"Error extrayendo el color: {str(e)}")
+    return None
+
+def verificar_errores_de_entrada(url):
+    """Verifica que los errores de entrada estén destacados visualmente y acompañados de mensajes claros."""
+    
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Verificación de Errores de Entrada", ln=True, align='L')
+
+
+    try:
+        driver.get(url)
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+        # Buscar mensajes de error junto a inputs
+        error_inputs = driver.find_elements(By.XPATH, "//input[@aria-invalid='true'] | //input[contains(@class, 'error')]")
+        error_messages = driver.find_elements(By.XPATH, "//div[contains(@class, 'error') or contains(@class, 'alert') or contains(@role, 'alert')]")
+
+        total_errors = len(error_inputs)
+        total_messages = len(error_messages)
+
+        # Verificar mensajes y colores de fondo
+        highlighted_errors = 0
+        for input_element in error_inputs:
+            style = input_element.get_attribute("style")
+            color = extract_color_value(style)
+            if color:
+                highlighted_errors += 1
+
+        # Resultados
+        if total_errors > 0:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Total de campos con errores detectados: {total_errors}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Total de mensajes de error claros encontrados: {total_messages}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Campos con errores visualmente destacados: {highlighted_errors} de {total_errors}")
+            
+            if highlighted_errors == total_errors and total_messages >= total_errors:
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(0, 6, "La página CUMPLE con el criterio de visualización de errores.")
+            else:
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(0, 6, "La página NO CUMPLE con el criterio de visualización de errores.")
+        else:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "No se encontraron errores de entrada en el formulario.")
+
+    except TimeoutException:
+        print(Fore.RED + " Error: La página tardó demasiado en cargar.")
+    except Exception as e:
+        print(Fore.RED + f" Error inesperado: {str(e)}")
+    finally:
+        driver.quit()
+
+# Prueba la función con una URL de prueba
+verificar_errores_de_entrada("https://www.mercadolibre.cl")  # Cambia a una URL de prueba
+def extract_color_value(style):
+    """Extrae valores de color del atributo de estilo en formato RGB o HEX."""
+    try:
+        match_rgb = re.search(r'rgb\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)', style)
+        match_hex = re.search(r'#([a-fA-F0-9]{6})', style)
+        if match_rgb:
+            return tuple(map(int, match_rgb.groups()))
+        elif match_hex:
+            return match_hex.group(0)
+    except Exception as e:
+        print(f"Error extrayendo el color: {str(e)}")
+    return None
+
+def verificar_errores_de_entrada(url):
+    """Verifica que los errores de entrada estén destacados visualmente y acompañados de mensajes claros."""
+    
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080")
+
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+
+    pdf.set_font("Arial", "I", size=10)
+    pdf.cell(200, 10, txt="Verificación de Errores de Entrada", ln=True, align='L')
+
+
+    try:
+        driver.get(url)
+        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+
+        # Buscar mensajes de error junto a inputs
+        error_inputs = driver.find_elements(By.XPATH, "//input[@aria-invalid='true'] | //input[contains(@class, 'error')]")
+        error_messages = driver.find_elements(By.XPATH, "//div[contains(@class, 'error') or contains(@class, 'alert') or contains(@role, 'alert')]")
+
+        total_errors = len(error_inputs)
+        total_messages = len(error_messages)
+
+        # Verificar mensajes y colores de fondo
+        highlighted_errors = 0
+        for input_element in error_inputs:
+            style = input_element.get_attribute("style")
+            color = extract_color_value(style)
+            if color:
+                highlighted_errors += 1
+
+        # Resultados
+        if total_errors > 0:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Total de campos con errores detectados: {total_errors}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Total de mensajes de error claros encontrados: {total_messages}")
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, f"- Campos con errores visualmente destacados: {highlighted_errors} de {total_errors}")
+            
+            if highlighted_errors == total_errors and total_messages >= total_errors:
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(0, 6, "La página CUMPLE con el criterio de visualización de errores.")
+            else:
+                pdf.set_font("Arial", size=8)
+                pdf.set_x(15)
+                pdf.multi_cell(0, 6, "La página NO CUMPLE con el criterio de visualización de errores.")
+        else:
+            pdf.set_font("Arial", size=8)
+            pdf.set_x(15)
+            pdf.multi_cell(0, 6, "No se encontraron errores de entrada en el formulario.")
+
+    except TimeoutException:
+        print(Fore.RED + " Error: La página tardó demasiado en cargar.")
+    except Exception as e:
+        print(Fore.RED + f" Error inesperado: {str(e)}")
+    finally:
+        driver.quit()
+
+
 for categoria in categorias:
     if categoria == "Validación de Accesibilidad Visual":
         verificar_accesibilidad_teclado(url)
@@ -2303,6 +2578,13 @@ for categoria in categorias:
         check_navigation_feedback(url)
         verificar_enlaces_coherencia_titulo(url)
         verificar_enlaces_genericos(url)
+    elif categoria == "Validación de Accesibilidad Motora":
+        validate_input_targets(url)
+        detect_blinking_content(url)
+        verificar_pestanas_navegacion(url)
+        verificar_errores_de_entrada(url)
+        verificar_orden_de_enfoque(url)
+        verificar_alternativas_gestos(url)  
 
 # Ejemplo de uso
 #hdu_dos_dos('https://www.mercadolibre.cl')
@@ -2313,174 +2595,6 @@ for categoria in categorias:
 #hdu_dos_siete('https://www.mercadolibre.cl')
 
 # Añadir la portada del documento
-
-# Parte 1: Añadir las imágenes de las clases 'icon' e 'image'
-output_icon_dir = "output_icon"  # Directorio con las imágenes de Icon e Image
-for class_dir in ['icon', 'image']:
-    class_path = os.path.join(output_icon_dir, class_dir)
-
-    if os.path.isdir(class_path):
-        class_images = [img for img in os.listdir(class_path) if img.endswith(('.jpg', '.jpeg', '.png'))]
-
-        if class_images:
-            # Añadir una nueva página para cada clase y su conteo
-            pdf.add_page()
-            pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 10, f"Capturas con los elementos '{class_dir}' destacados", ln=True)
-            pdf.ln(10)
-
-            # Añadir las imágenes (máximo 2 por página)
-            image_counter = 0
-            for i, image_file in enumerate(class_images, 1):
-                if image_counter == 2:
-                    # Añadir nueva página si alcanzamos el límite de 2 imágenes
-                    pdf.add_page()
-                    pdf.set_font("Arial", "B", 12)
-                    pdf.cell(0, 10, f"Capturas con los elementos '{class_dir}' destacados (continuación)", ln=True)
-                    pdf.ln(10)
-                    image_counter = 0
-
-                # Añadir la imagen de la clase
-                image_path = os.path.join(class_path, image_file)
-                try:
-                    with Image.open(image_path) as img:
-                        original_image_width, original_image_height = img.size
-
-                    # Calcular las dimensiones para el PDF
-                    pdf_width, pdf_height = pdf.w - 20, pdf.h - 40  # Ajustar para margen
-                    aspect_ratio = original_image_width / original_image_height
-
-                    # Ajustar el tamaño de la imagen manteniendo su aspecto
-                    if original_image_width > pdf_width:
-                        img_width = pdf_width
-                        img_height = pdf_width / aspect_ratio
-                    else:
-                        img_width = original_image_width
-                        img_height = original_image_height
-
-                    # Limitar la altura para asegurar que no se salga de la página
-                    if img_height > pdf_height / 2:
-                        img_height = pdf_height / 2
-                        img_width = img_height * aspect_ratio
-
-                    # Verificar si hay suficiente espacio para la imagen
-                    if pdf.get_y() + img_height > pdf.h - 20:
-                        pdf.add_page()
-
-                    # Calcular la posición centrada de la imagen
-                    x_image = (pdf.w - img_width) / 2
-                    y_image = pdf.get_y()
-
-                    # Insertar la imagen
-                    pdf.image(image_path, x=x_image, y=y_image, w=img_width, h=img_height)
-
-                    # Dibujar el borde alrededor de la imagen
-                    pdf.set_draw_color(0, 0, 0)
-                    pdf.rect(x_image, y_image, img_width, img_height)
-
-                    # Ajustar el offset en Y para la siguiente imagen
-                    pdf.ln(img_height + 10)
-                    image_counter += 1
-                except Exception as e:
-                    print(f"Error al procesar la imagen {image_file}: {e}")
-
-# Parte 2: Añadir las imágenes de las demás clases
-y_offset = None  # Reiniciar el offset en Y para la siguiente clase
-current_x = 10  # Posición X inicial
-spacing_x = 10  # Espacio entre las imágenes
-margin = 10  # Margen entre las imágenes y los bordes
-max_image_height = 0
-add_page_flag = True  # Controla si es necesario añadir una nueva página al comenzar
-
-output_cingoz_dir = "output_cingoz"  # Directorio principal para otras clases
-for class_dir in os.listdir(output_cingoz_dir):
-    class_path = os.path.join(output_cingoz_dir, class_dir)
-
-    if os.path.isdir(class_path) and class_dir not in ['icon', 'image']:
-        class_images = [img for img in os.listdir(class_path) if img.endswith(('.jpg', '.jpeg', '.png'))]
-
-        if class_images:
-            if add_page_flag:
-                pdf.add_page()
-                add_page_flag = False
-
-            # Añadir el conteo de imágenes reconocidas para cada clase
-            pdf.set_font("Arial", "B", 12)
-            class_count = len(class_images)
-            pdf.cell(0, 10, f"Numero de elementos de la clase '{class_dir}' encontrados: {class_count}", ln=True)
-            pdf.ln(10)
-
-            # Añadir las imágenes en una lista (una sobre otra)
-            for i, image_file in enumerate(class_images, 1):
-                image_path = os.path.join(class_path, image_file)
-                try:
-                    with Image.open(image_path) as img:
-                        original_width, original_height = img.size
-
-                    original_width_mm = original_width * 0.264583
-                    original_height_mm = original_height * 0.264583
-
-                    # Verificar si se requiere una nueva página antes de añadir la imagen
-                    if pdf.get_y() + original_height_mm > pdf.h - 20:
-                        pdf.add_page()
-                        pdf.set_font("Arial", "B", 12)
-                        pdf.cell(0, 10, f"Numero de elementos de la clase '{class_dir}' encontrados (continuación):", ln=True)
-                        pdf.ln(10)
-
-                    y_pos = pdf.get_y()
-                    pdf.set_draw_color(0, 0, 0)
-                    pdf.rect(10 - 1, y_pos - 1, original_width_mm + 2, original_height_mm + 2)
-                    pdf.image(image_path, x=10, y=y_pos, w=original_width_mm)
-                    pdf.ln(original_height_mm + 10)
-                except Exception as e:
-                    print(f"Error al procesar la imagen {image_file}: {e}")
-
-# Parte 3: Añadir las imágenes de ProgressBar
-output_pb_dir = "output_pb"  # Asegúrate de que este directorio exista
-progressbar_images = [img for img in os.listdir(output_pb_dir) if img.endswith(('.jpg', '.jpeg', '.png'))]
-
-if progressbar_images:
-    if current_x != 10:  # Si aún hay espacio en la página actual, continuamos
-        pdf.ln(max_image_height + 10)
-    else:
-        pdf.add_page()
-
-    pdf.set_font("Arial", "B", 12)
-    progressbar_count = len(progressbar_images)
-    pdf.cell(0, 10, f"Barras de progreso encontradas: {progressbar_count}", ln=True)
-    pdf.ln(10)
-
-    # Añadir las imágenes de ProgressBar con el mismo formato
-y_offset = None
-current_x = 10
-max_image_height = 0
-
-for i, image_file in enumerate(progressbar_images, 1):
-    image_path = os.path.join(output_pb_dir, image_file)
-    try:
-        with Image.open(image_path) as img:
-            original_width, original_height = img.size
-
-        original_width_mm = original_width * 0.264583
-        original_height_mm = original_height * 0.264583
-
-        # Verificar si se requiere una nueva página antes de añadir la imagen
-        if pdf.get_y() + original_height_mm > pdf.h - 20:
-            pdf.add_page()
-            pdf.set_font("Arial", "B", 12)
-            pdf.cell(0, 10, "Barras de progreso encontradas (continuación):", ln=True)
-            pdf.ln(10)
-            current_x = 10
-            max_image_height = 0
-
-        y_pos = pdf.get_y()
-        pdf.set_draw_color(0, 0, 0)
-        pdf.rect(10 - 1, y_pos - 1, original_width_mm + 2, original_height_mm + 2)
-        pdf.image(image_path, x=10, y=y_pos, w=original_width_mm)
-        pdf.ln(original_height_mm + 10)
-    except Exception as e:
-        print(f"Error al procesar la imagen {image_file}: {e}")
-
 
 # Inicializa Firebase
 cred = credentials.Certificate('src\components\config\iatu-pmv-firebase-adminsdk-my9kl-4321b8a185.json')

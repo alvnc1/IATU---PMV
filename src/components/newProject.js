@@ -44,7 +44,10 @@ function NewProject() {
             "Cognitiva y Organizacion Visual",
             "Ayuda Contextual"
         ],
-        Accesibilidad: []  // De momento vacío
+        Accesibilidad: [
+            "Validación de Accesibilidad Visual",
+            "Validación de Accesibilidad Cognitiva"
+        ] 
     };
 
     const handleCategoriaChange = (categoria) => {
