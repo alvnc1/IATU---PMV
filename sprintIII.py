@@ -1,4 +1,5 @@
 import shutil
+import cv2
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
@@ -10,6 +11,134 @@ from textstat import textstat
 from PIL import Image, ImageStat
 import spacy
 import shutil
+from inference_sdk import InferenceHTTPClient
+from scenedetect import open_video, SceneManager
+from scenedetect.detectors import ContentDetector
+
+
+# Crear una carpeta para guardar las capturas si no existe
+output_dir = 'capturas'
+if not os.path.exists(output_dir):
+    os.makedirs(output_dir)
+video_path = "ml.mp4"
+# Abrir el video con la función moderna de scenedetect
+video = open_video(video_path)
+
+pdf = FPDF()
+pdf.add_page()
+
+
+# Crear un SceneManager y añadir un detector de contenido
+scene_manager = SceneManager()
+scene_manager.add_detector(ContentDetector(threshold=30.0))  # Ajusta el umbral si es necesario
+
+# Detectar escenas en el video
+scene_manager.detect_scenes(video)
+
+# Obtener la lista de escenas detectadas
+scene_list = scene_manager.get_scene_list()
+
+print(f"Detectadas {len(scene_list)} escenas.")
+
+# Cargar el video con OpenCV para capturar fotogramas
+cap = cv2.VideoCapture(video_path)
+fps = cap.get(cv2.CAP_PROP_FPS)  # Obtener los FPS del video
+
+for i, scene in enumerate(scene_list):
+    start_frame, end_frame = scene[0].get_frames(), scene[1].get_frames()
+    timestamp = scene[0].get_seconds()
+
+    # Calcular el número de fotogramas a avanzar para capturar el fotograma 1.5 segundos después
+    frames_to_advance = int(fps * 1.5)
+    new_frame_position = start_frame + frames_to_advance
+
+    # Mover el puntero del video al nuevo fotograma (1.5 segundos después)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, new_frame_position)
+
+    # Leer y guardar el fotograma 1.5 segundos después del cambio de escena
+    ret, frame = cap.read()
+    if ret:
+        filename = os.path.join(output_dir, f"Escena_{i + 1}_{int(timestamp + 1.5)}s.png")
+        cv2.imwrite(filename, frame)
+        print(f"Guardado {filename}")
+
+cap.release()
+
+
+# Inicializar el cliente HTTP para inferencias
+CLIENT = InferenceHTTPClient(
+    api_url="https://detect.roboflow.com",
+    api_key="bUyMUjRY0TGSKrbNpksy"
+)
+
+# Directorio de imágenes de entrada
+input_dir = "capturas"
+output_base_dir = "output_evaluated_images"
+os.makedirs(output_base_dir, exist_ok=True)
+
+# Inicializar el diccionario para las clases
+dic_clases = {}
+
+# Obtener dimensiones de la página
+page_width = pdf.w
+page_height = pdf.h
+
+# Centrar el título horizontal y verticalmente
+pdf.set_xy(0, page_height / 2 - 10)  # Centramos en Y a la mitad de la página
+pdf.set_font("Arial", 'B', 16)
+pdf.cell(page_width, 10, txt="Componentes Encontrados y Elementos a Analizar", ln=True, align="C")
+
+# Procesar cada imagen
+for idx, image_filename in enumerate(os.listdir(input_dir)):
+    if image_filename.endswith(('.jpg', '.jpeg', '.png')):
+        image_path = os.path.join(input_dir, image_filename)
+
+        # Realizar la inferencia con los modelos
+        result = CLIENT.infer(image_path, model_id="cingoz8/1")
+        result_model_2 = CLIENT.infer(image_path, model_id="app-icon/45")
+
+        # Combinar los resultados de ambos modelos
+        combined_results = result['predictions'] + result_model_2['predictions']
+
+        # Crear subdirectorio para la imagen
+        image_output_dir = os.path.join(output_base_dir, os.path.splitext(image_filename)[0])
+        os.makedirs(image_output_dir, exist_ok=True)
+
+        # Cargar la imagen original
+        image = cv2.imread(image_path)
+        original_height, original_width, _ = image.shape
+
+        # Procesar los resultados y dibujar bounding boxes en la imagen original
+        for i, prediction in enumerate(combined_results):
+            # Coordenadas de la bounding box
+            x0 = int(prediction['x'] - prediction['width'] / 2)
+            y0 = int(prediction['y'] - prediction['height'] / 2)
+            x1 = int(prediction['x'] + prediction['width'] / 2)
+            y1 = int(prediction['y'] + prediction['height'] / 2)
+
+            # Dibujar la bounding box en la imagen original
+            cv2.rectangle(image, (x0, y0), (x1, y1), color=(0, 255, 0), thickness=2)
+
+            # Poner el label (clase y confianza) encima de la bounding box
+            label = f"{prediction['class']} ({prediction['confidence']:.2f})"
+            cv2.putText(image, label, (x0, y0 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        # Guardar la imagen original con todas las bounding boxes dibujadas
+        output_image_path = os.path.join(image_output_dir, os.path.basename(image_path))
+        cv2.imwrite(output_image_path, image)
+
+        # Añadir la imagen completa con bounding boxes al PDF
+        if idx % 2 == 0:
+            pdf.add_page()  # Añadir nueva página para cada par de imágenes
+
+        # Posicionar la primera o segunda imagen en la página
+        x_pos = 10  # Margen izquierdo
+        y_pos = 10 if idx % 2 == 0 else 150  # Posicionar la imagen: arriba (y=10) o abajo (y=150)
+        pdf.image(output_image_path, x=x_pos, y=y_pos, w=180)  # Ajustar el tamaño según sea necesario
+
+pdf.add_page()
+
+#result = CLIENT.infer(your_image.jpg, model_id="cingoz8/1")
 
 
 def hdu_tres(url):
@@ -62,8 +191,7 @@ def hdu_tres(url):
         with Image.open(image_path) as img:
             return img.size[0] <= max_size[0] and img.size[1] <= max_size[1]
     # Inicializar el PDF
-    pdf = FPDF()
-    pdf.add_page()
+    
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="Verificación de Legibilidad de Texto en la UI", ln=True, align='C')
     # Extraer todos los elementos de texto
@@ -106,15 +234,14 @@ def hdu_tres(url):
 
 
     # Cerrar el navegador
-    driver.quit()
+    #driver.quit()
 
     # Eliminar el directorio de capturas al finalizar
     if os.path.exists(capturas_dir):
         shutil.rmtree(capturas_dir)
 
 # Guardar el PDF con los resultados
-    output_filename = "reporte_legibilidad_ui.pdf"
-    pdf.output(output_filename)
+    
 
 
 def verificar_enlaces_coherencia_titulo(url):
@@ -130,10 +257,8 @@ def verificar_enlaces_coherencia_titulo(url):
     enlaces_dir = os.path.join(capturas_dir, "enlaces")
     os.makedirs(enlaces_dir, exist_ok=True)
 
-    # Inicializar el PDF
-    pdf = FPDF()
+    
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="Verificación de Coherencia entre Enlaces y Títulos de Página", ln=True, align='C')
 
     # Navegar a la URL
@@ -203,11 +328,11 @@ def verificar_enlaces_coherencia_titulo(url):
     pdf.multi_cell(200, 10, txt=f"- Número de enlaces que coinciden con el título de la página de destino: {enlaces_coinciden}")
 
     # Guardar el PDF con los resultados
-    output_filename = "reporte_coherencia_enlaces.pdf"
-    pdf.output(output_filename, dest='F')  # Guardar usando 'utf-8'
+    #output_filename = "reporte_coherencia_enlaces.pdf"
+    #pdf.output(output_filename, dest='F')  # Guardar usando 'utf-8'
 
     # Cerrar el navegador
-    driver.quit()
+    #driver.quit()
 
     # Eliminar el directorio de capturas al finalizar
     if os.path.exists(capturas_dir):
@@ -221,10 +346,8 @@ def verificar_enlaces_genericos(url):
     chrome_options.add_argument("--disable-dev-shm-usage")
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-    # Inicializar el PDF
-    pdf = FPDF()
+    
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, txt="Verificación de Enlaces con Texto Genérico", ln=True, align='C')
 
     # Navegar a la URL
@@ -256,15 +379,17 @@ def verificar_enlaces_genericos(url):
     pdf.cell(200, 10, txt=f"- Número total de enlaces con texto descriptivo: {enlaces_correctos_count}", ln=True)
 
     # Guardar el PDF con los resultados
-    output_filename = "reporte_enlaces_genericos.pdf"
-    pdf.output(output_filename, dest='F')
+    #output_filename = "reporte_enlaces_genericos.pdf"
+    #pdf.output(output_filename, dest='F')
 
     # Cerrar el navegador
     driver.quit()
 
 
-verificar_enlaces_genericos("https://www.mercadolibre.cl")
-#verificar_enlaces_coherencia_titulo("https://www.mercadolibre.cl")
-# Navegar a la URL
-#url = "https://www.mercadolibre.cl"  # URL de ejemplo
-#hdu_tres(url)
+url = "https://www.mercadolibre.cl"  # URL de ejemplo
+hdu_tres(url)
+verificar_enlaces_coherencia_titulo(url)
+verificar_enlaces_genericos(url)
+
+output_filename = "reporte_legibilidad_ui.pdf"
+pdf.output(output_filename)
