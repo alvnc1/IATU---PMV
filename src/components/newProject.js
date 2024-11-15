@@ -5,7 +5,6 @@ import Container from "react-bootstrap/Container";
 import Form from 'react-bootstrap/Form';
 import Button from 'react-bootstrap/Button';
 import Dropdown from 'react-bootstrap/Dropdown';
-import DropdownButton from 'react-bootstrap/DropdownButton';
 import { MdSave } from "react-icons/md";
 import { db, storage } from "./firebase"; 
 import { doc, setDoc, collection } from "firebase/firestore";
@@ -20,36 +19,36 @@ function NewProject() {
     const [files, setFiles] = useState([]);
     const [uploadStatus, setUploadStatus] = useState({});
     const [selectedCategorias, setSelectedCategorias] = useState([]);
+    const [openCategory, setOpenCategory] = useState(null); // Controlar qué categoría principal está expandida
     const navigate = useNavigate();
 
     const auth = getAuth();  // Inicializamos Firebase Auth
 
-    const categorias = [
-        "Página de Inicio",
-        "Orientación de Tareas",
-        "Navegabilidad",
-        "Formularios",
-        "Confianza y Credibilidad",
-        "Calidad del Contenido",
-        "Diagramación y Diseño",
-        "Sección de Búsquedas",
-        "Sección de Reconocimiento de Errores y Retroalimentación"
-    ];
-
-    const handleNombreProyectoChange = (e) => {
-        setNombreProyecto(e.target.value);
-    };
-
-    const handleDescripcionProyectoChange = (e) => {
-        setDescripcionProyecto(e.target.value);
-    };
-
-    const handleNombreTareaChange = (e) => {
-        setNombreTarea(e.target.value);
-    };
-
-    const handleUrlTareaChange = (e) => {
-        setUrlTarea(e.target.value);  
+    const categorias = {
+        Usabilidad: [
+            "Página de Inicio",
+            "Orientación de Tareas",
+            "Navegabilidad",
+            "Formularios",
+            "Confianza y Credibilidad",
+            "Calidad del Contenido",
+            "Diagramación y Diseño",
+            "Sección de Búsquedas",
+            "Sección de Reconocimiento de Errores y Retroalimentación"
+        ],
+        "Adultos Mayores": [
+            "Retroalimentacion de Acciones",
+            "Facilidad de Navegacion",
+            "Legibilidad del Texto",
+            "Interaccion con Elementos Clickables",
+            "Cognitiva y Organizacion Visual",
+            "Ayuda Contextual"
+        ],
+        Accesibilidad: [
+            "Validación de Accesibilidad Visual",
+            "Validación de Accesibilidad Cognitiva",
+            "Validación de Accesibilidad Motora"
+        ]
     };
 
     const handleCategoriaChange = (categoria) => {
@@ -61,6 +60,40 @@ function NewProject() {
             }
         });
     };
+
+    const toggleCategory = (category) => {
+        setOpenCategory(openCategory === category ? null : category);
+    };
+
+    const renderCategoriasMenu = () => (
+        <Dropdown>
+            <Dropdown.Toggle variant="outline-secondary" id="dropdown-basic">
+                Selecciona las categorías
+            </Dropdown.Toggle>
+            <Dropdown.Menu>
+                {Object.keys(categorias).map((key) => (
+                    <div key={key}>
+                        <Dropdown.ItemText onClick={() => toggleCategory(key)} style={{ cursor: "pointer" }}>
+                            {key}
+                        </Dropdown.ItemText>
+                        {openCategory === key && (
+                            <div style={{ marginLeft: '20px' }}>
+                                {categorias[key].map((subItem) => (
+                                    <Form.Check
+                                        type="checkbox"
+                                        label={subItem}
+                                        key={subItem}
+                                        checked={selectedCategorias.includes(subItem)}
+                                        onChange={() => handleCategoriaChange(subItem)}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </Dropdown.Menu>
+        </Dropdown>
+    );
 
     const handleFileUpload = async (file) => {
         const fileId = Date.now().toString();
@@ -87,6 +120,7 @@ function NewProject() {
         }
     };
 
+    // Definimos handleFilesChange para manejar la carga de múltiples archivos
     const handleFilesChange = (e) => {
         const filesArray = Array.from(e.target.files);
         filesArray.forEach(file => handleFileUpload(file));
@@ -108,12 +142,11 @@ function NewProject() {
                 nombreProyecto,
                 descripcionProyecto,
                 fechaCreacion: new Date().toISOString(),
-                userId // Almacenamos el UID del usuario junto con los datos del proyecto
+                userId
             };
 
             await setDoc(proyectoRef, proyectoData);
 
-            // Luego crear y guardar la tarea dentro del proyecto recién creado
             if (nombreTarea || urlTarea || files.length > 0) {
                 const tareaRef = doc(collection(proyectoRef, "tasks"));
                 const tareaData = {
@@ -126,7 +159,6 @@ function NewProject() {
                 await setDoc(tareaRef, tareaData);
             }
 
-            // Limpiar los estados después de guardar
             setNombreProyecto('');
             setDescripcionProyecto('');
             setNombreTarea('');
@@ -134,7 +166,6 @@ function NewProject() {
             setSelectedCategorias([]);
             setFiles([]);
 
-            alert("Proyecto y tarea guardados correctamente!");
             navigate('/projects');
         } catch (error) {
             console.error("Error al guardar proyecto y tarea en Firebase: ", error);
@@ -154,7 +185,7 @@ function NewProject() {
                         backgroundColor: "white",
                         borderRadius: "10px",
                         padding: "20px",
-                        width: "95%", 
+                        width: "90%", 
                         maxWidth: "1200px",
                         height: "auto",
                         overflowY: "auto",
@@ -179,7 +210,7 @@ function NewProject() {
                                 type="text"
                                 placeholder="Escribe el nombre del proyecto..."
                                 value={nombreProyecto}
-                                onChange={handleNombreProyectoChange}
+                                onChange={(e) => setNombreProyecto(e.target.value)}
                             />
                         </Form.Group>
 
@@ -190,7 +221,7 @@ function NewProject() {
                                 rows={3}
                                 placeholder="Da una breve descripción del proyecto..."
                                 value={descripcionProyecto}
-                                onChange={handleDescripcionProyectoChange}
+                                onChange={(e) => setDescripcionProyecto(e.target.value)}
                             />
                         </Form.Group>
 
@@ -200,24 +231,13 @@ function NewProject() {
                                 type="text"
                                 placeholder="Escribe el nombre de la tarea..."
                                 value={nombreTarea}
-                                onChange={handleNombreTareaChange}
+                                onChange={(e) => setNombreTarea(e.target.value)}
                             />
                         </Form.Group>
                         
                         <Form.Group controlId="formBasicCategoriaTareas">
                             <Form.Label style={{ fontWeight: 'bold', marginTop: '20px' }}>Categoría de la Tarea</Form.Label>
-                            <DropdownButton id="dropdown-basic-button" title="Selecciona las categorías" variant="outline-secondary">
-                                {categorias.map((categoria) => (
-                                    <Dropdown.Item key={categoria} as="button">
-                                        <Form.Check
-                                            type="checkbox"
-                                            label={categoria}
-                                            checked={selectedCategorias.includes(categoria)}
-                                            onChange={() => handleCategoriaChange(categoria)}
-                                        />
-                                    </Dropdown.Item>
-                                ))}
-                            </DropdownButton>
+                            {renderCategoriasMenu()}
                         </Form.Group>
 
                         <Form.Group controlId="formBasicUrlTarea">
@@ -226,7 +246,7 @@ function NewProject() {
                                 type="url"
                                 placeholder="Ingresa la URL relacionada con la tarea..."
                                 value={urlTarea}
-                                onChange={handleUrlTareaChange}
+                                onChange={(e) => setUrlTarea(e.target.value)}
                             />
                         </Form.Group>
 

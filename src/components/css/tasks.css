@@ -1,0 +1,22 @@
+.submenu-item {
+    cursor: pointer;
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.submenu-item:hover {
+    background-color: #f1f1f1;
+}
+
+.dropdown-menu .dropdown-menu {
+    top: 0;
+    left: 100%;
+    margin-top: -1px;
+    position: absolute;
+}
+
+.dropdown-submenu {
+    position: relative;
+}

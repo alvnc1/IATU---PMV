@@ -6,23 +6,24 @@ const port = 3001;
 
 // Configurar CORS para permitir solicitudes
 app.use(cors({
-  origin: 'http://localhost:3000'  // Aquí defines qué origen está permitido
-}));
+    origin: '*'
+  }));
 
 app.use(express.json());
 
 app.post('/run-python', (req, res) => {
-    const { videoUrl, urlTarea, categorias } = req.body;
+    const { videoUrl, urlTarea, categorias, idT , idP} = req.body;
 
     if (!videoUrl || !urlTarea || !categorias) {
         return res.status(400).json({ error: 'Video URL, URL de la Tarea y Categorías son requeridos' });
     }
 
     // Log para ver los datos recibidos
-    console.log(`Datos recibidos - videoUrl: ${videoUrl}, urlTarea: ${urlTarea}, categorias: ${categorias}`);
+    console.log(`Datos recibidos - videoUrl: ${videoUrl}, urlTarea: ${urlTarea}, categorias: ${categorias}, id:${idT}, id Proyecto: ${idP}`);
 
     // Ejecutar el proceso de Python
-    const pythonProcess = spawn('python', ['script.py', videoUrl,urlTarea,categorias]);
+    const pythonProcess = spawn('python', ['checkAccesibilidad.py', videoUrl,urlTarea,categorias,idT,idP]);
+    
 
     pythonProcess.stdout.on('data', (data) => {
         console.log(`stdout: ${data}`);

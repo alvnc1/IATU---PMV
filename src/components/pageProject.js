@@ -4,8 +4,8 @@ import Container from "react-bootstrap/Container";
 import Table from "react-bootstrap/Table";
 import Button from 'react-bootstrap/Button';
 import Modal from 'react-bootstrap/Modal';
-import { MdDelete, MdPlayArrow, MdAdd, MdVideoLibrary } from "react-icons/md";
-import { collection, getDocs, deleteDoc, doc, getDoc } from 'firebase/firestore';
+import { MdDelete, MdPlayArrow, MdAdd, MdVideocam } from "react-icons/md";
+import { collection, getDocs, deleteDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from "./firebase";
 import { useNavigate } from 'react-router-dom';
 import { useParams } from 'react-router-dom';
@@ -16,8 +16,10 @@ function ProjectPage() {
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [videoUrl, setVideoUrl] = useState(''); // Nuevo estado para la URL del video
-  const [showVideoModal, setShowVideoModal] = useState(false); // Nuevo estado para controlar la visibilidad del modal de video
+  const [videoUrl, setVideoUrl] = useState('');
+  const [showVideoModal, setShowVideoModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false); // Estado para el modal de confirmación de eliminación
+  const [taskToDelete, setTaskToDelete] = useState(null); // Estado para la tarea a eliminar
   const [sortOrder, setSortOrder] = useState('asc');
   const [testStatus, setTestStatus] = useState({});
   const [projectName, setProjectName] = useState(''); 
@@ -41,6 +43,7 @@ function ProjectPage() {
     const tasksCollection = collection(db, 'proyectos', id, 'tasks');
     const snapshot = await getDocs(tasksCollection);
     const tasksList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  
     tasksList.sort((a, b) => {
       if (sortOrder === 'asc') {
         return new Date(a.fechaCreacion) - new Date(b.fechaCreacion);
@@ -48,24 +51,31 @@ function ProjectPage() {
         return new Date(b.fechaCreacion) - new Date(a.fechaCreacion);
       }
     });
-    setTasks(tasksList);
-
-    const initialStatus = {};
+  
+    const updatedStatus = {};
     tasksList.forEach(task => {
-      initialStatus[task.id] = testStatus[task.id] || 'Pendiente';
+      updatedStatus[task.id] = task.pdfUrl ? 'Finalizado' : (testStatus[task.id] || 'Pendiente');
     });
-    setTestStatus(initialStatus);
+  
+    setTasks(tasksList);
+    setTestStatus(updatedStatus);
   };
 
-  const deleteTask = async (taskId) => {
+  const handleDeleteTask = (taskId) => {
+    setTaskToDelete(taskId); // Establece la tarea a eliminar
+    setShowDeleteModal(true); // Muestra el modal de confirmación
+  };
+
+  const confirmDeleteTask = async () => {
     try {
-      await deleteDoc(doc(db, 'proyectos', id, 'tasks', taskId));
+      await deleteDoc(doc(db, 'proyectos', id, 'tasks', taskToDelete));
       getTasks();
-      alert('Tarea eliminada correctamente');
     } catch (error) {
       console.error('Error al eliminar la tarea: ', error);
       alert('Hubo un error al eliminar la tarea');
     }
+    setShowDeleteModal(false); // Cierra el modal después de la eliminación
+    setTaskToDelete(null); // Resetea el estado de la tarea a eliminar
   };
 
   const handleShowModal = (task) => {
@@ -82,46 +92,45 @@ function ProjectPage() {
     navigate(`/newTask/${id}`);
   };
 
-  const handlePlayTask = (taskId) => {
+  const handlePlayTask = (task) => {
     setIsLoading(true);
-
-    const videoUrl = taskId.files.find(file => file.url).url;
-    const urlTarea = taskId.urlTarea;
-    const categorias = taskId.categorias;
+  
+    const videoUrl = task.files.find(file => file.url).url;
+    const urlTarea = task.urlTarea;
+    const categorias = task.categorias;
+    const idT = task.id;
+    const idP = id;
     console.log(videoUrl);
     console.log(urlTarea);
     console.log(categorias);
-
+    console.log(task.id);
+  
     if (!videoUrl || !urlTarea || !categorias) {
       setIsLoading(false);
       return alert('Faltan datos para ejecutar el análisis');
     }
-
+  
     setTestStatus(prevStatus => ({
       ...prevStatus,
-      [taskId.id]: 'Ejecutando'
+      [task.id]: 'Ejecutando'
     }));
-
+  
     fetch('http://localhost:3001/run-python', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ videoUrl, urlTarea, categorias })
+      body: JSON.stringify({ videoUrl, urlTarea, categorias, idT, idP })
     })
     .then(response => response.json())
-    .then(data => {
-      console.log('Respuesta del servidor:', data);
-      setTestStatus(prevStatus => ({
-        ...prevStatus,
-        [taskId.id]: 'Finalizado'
-      }));
+    .then(() => {
+      getTasks();
     })
     .catch(error => {
       console.error('Error al ejecutar el script de Python:', error);
       setTestStatus(prevStatus => ({
         ...prevStatus,
-        [taskId.id]: 'Error'
+        [task.id]: 'Error'
       }));
     })
     .finally(() => {
@@ -129,17 +138,18 @@ function ProjectPage() {
     });
   };
 
-  // Función para descargar el PDF
-  const handleDownload = () => {
+  const handleDownloadPDF = (pdfUrl, taskId) => {
+    if (!pdfUrl) return;
+  
     const link = document.createElement('a');
-    link.href = process.env.PUBLIC_URL + '/informe.pdf';  // Ruta al PDF en el directorio 'public'
-    link.setAttribute('download', 'informe.pdf');  // Nombre con el que se descargará
+    link.href = pdfUrl;
+    link.target = '_blank';
+    link.setAttribute('download', `${taskId}_informe.pdf`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Maneja la reproducción del video
   const handleShowVideoModal = (task) => {
     const videoFile = task.files.find(file => file.url);
     if (videoFile) {
@@ -190,19 +200,24 @@ function ProjectPage() {
                   <td>{new Date(task.fechaCreacion).toLocaleDateString()}</td>
                   <td>{testStatus[task.id]}</td>
                   <td>
-                    <Button variant="outline-primary" onClick={handleDownload} className="me-2 pdf-button">
+                    <Button
+                      variant="outline-primary"
+                      onClick={() => handleDownloadPDF(task.pdfUrl, task.id)}
+                      className="me-2 pdf-button"
+                      disabled={!task.pdfUrl}
+                    >
                       PDF
                     </Button>
                   </td>
                   <td>
                     <div className="action-buttons">
-                      <Button variant="success" onClick={() => handlePlayTask(task)} className="play-button">
+                      <Button variant="success" onClick={() => handlePlayTask(task)} className="play-button" title="Ejecutar">
                         <MdPlayArrow size={20} />
                       </Button>
-                      <Button variant="success" onClick={() => handleShowVideoModal(task)} className="play-button">
-                        <MdVideoLibrary size={20} />
+                      <Button variant="success" onClick={() => handleShowVideoModal(task)} className="video-button" title="Ver video">
+                        <MdVideocam size={20} />
                       </Button>
-                      <Button variant="danger" onClick={() => deleteTask(task.id)} className="delete-button">
+                      <Button variant="danger" onClick={() => handleDeleteTask(task.id)} className="delete-button" title="Eliminar tarea">
                         <MdDelete size={20} />
                       </Button>
                     </div>
@@ -256,6 +271,24 @@ function ProjectPage() {
             <p>No se encontró la URL del video.</p>
           )}
         </Modal.Body>
+      </Modal>
+
+      {/* Modal de confirmación para eliminar tarea */}
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirmar Eliminación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          ¿Estás seguro de que deseas eliminar esta tarea?
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={confirmDeleteTask}>
+            Eliminar
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );
