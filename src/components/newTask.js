@@ -149,7 +149,6 @@ function NewTask() {
             setUrlTarea('');
             setSelectedCategorias([]);
             setFiles([]);
-            alert("Tarea guardada correctamente!");
             navigate(`/project/${projectId}`);
         } catch (error) {
             console.error("Error al guardar la tarea en Firebase: ", error);

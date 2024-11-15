@@ -77,6 +77,7 @@ from fpdf import FPDF
 from urllib.parse import urlparse, unquote
 
 
+backslash = '\n' 
 # Obtener la ruta del video desde los argumentos de la línea de comandos
 video_path = sys.argv[1]
 url = sys.argv[2]
@@ -1616,6 +1617,7 @@ def hdu_cuatro(url):
     elements = driver.find_elements(By.XPATH, "//*[not(self::script or self::style)][text()]")
 
     # Guardar las capturas de los elementos y añadirlas al PDF sin modificar su tamaño si son útiles y pequeñas
+    
     for index, elem in enumerate(elements, start=1):
         text = elem.text.strip()
         if text:
@@ -1627,7 +1629,7 @@ def hdu_cuatro(url):
             if gunning_fog > 12 or flesch_reading_ease < 60:
                 pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
-                pdf.multi_cell(0, 6, txt=f"- Advertencia: Texto con legibilidad insuficiente encontrado: '{text[:50].replace('\n', '')}...'\n  Gunning Fog: {gunning_fog}, Flesch Reading Ease: {flesch_reading_ease}")      
+                pdf.multi_cell(0, 6, txt=f"- Advertencia: Texto con legibilidad insuficiente encontrado: '{text[:50].replace(backslash, '')}...'{backslash}  Gunning Fog: {gunning_fog}, Flesch Reading Ease: {flesch_reading_ease}")      
                 # Capturar la imagen del elemento
                 location = elem.location
                 size = elem.size
@@ -1707,7 +1709,7 @@ def verificar_enlaces_coherencia_titulo(url):
             else:
                 pdf.set_font("Arial", size=8)
                 pdf.set_x(15)
-                pdf.multi_cell(0, 6, f"- Advertencia: El enlace '{safe_link_text.replace('\n', '')}' NO coincide con el título de la página de destino: '{safe_page_title.replace('\n', '')}'")
+                pdf.multi_cell(0, 6, f"- Advertencia: El enlace '{safe_link_text.replace(backslash, '')}' NO coincide con el título de la página de destino: '{safe_page_title.replace(backslash, '')}'")
                 
                 # Guardar la captura de pantalla de la página de destino
                 screenshot_path = os.path.join(enlaces_dir, f"enlace_{index}_captura.png")
@@ -5931,7 +5933,7 @@ initialize_app(cred, {'storageBucket': 'iatu-pmv.appspot.com'})
 # Usar BytesIO para guardar el PDF en memoria
 pdf_stream = BytesIO()
 # Guardar el contenido del PDF en el flujo de bytes usando el parámetro dest='S'
-pdf_output = pdf.output(dest='S').encode('latin1')  # En FPDF, el formato de salida es string, lo convertimos a bytes
+pdf_output = pdf.output(dest='S').encode('latin1', 'replace')  # En FPDF, el formato de salida es string, lo convertimos a bytes
 pdf_stream.write(pdf_output)
 pdf_stream.seek(0)  # Mover el cursor al inicio del archivo en memoria
 
@@ -5959,8 +5961,8 @@ task_ref.update({
 print(f"URL del PDF guardada en Firestore: {pdf_url}")
 
 
-# shutil.rmtree('capturas')
-# shutil.rmtree('output_evaluated_images')
+shutil.rmtree('capturas')
+shutil.rmtree('output_evaluated_images')
 # shutil.rmtree('capturas_navegacion')
 # shutil.rmtree('capturasSelenium')
 # shutil.rmtree('fotosSelenium')

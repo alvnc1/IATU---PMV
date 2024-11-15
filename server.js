@@ -6,8 +6,8 @@ const port = 3001;
 
 // Configurar CORS para permitir solicitudes
 app.use(cors({
-  origin: 'http://localhost:3000'  // Aquí defines qué origen está permitido
-}));
+    origin: '*'
+  }));
 
 app.use(express.json());
 

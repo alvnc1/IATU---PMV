@@ -46,8 +46,9 @@ function NewProject() {
         ],
         Accesibilidad: [
             "Validación de Accesibilidad Visual",
-            "Validación de Accesibilidad Cognitiva"
-        ] 
+            "Validación de Accesibilidad Cognitiva",
+            "Validación de Accesibilidad Motora"
+        ]
     };
 
     const handleCategoriaChange = (categoria) => {
